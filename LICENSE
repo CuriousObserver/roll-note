@@ -19,10 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-RollNote is an all-new, independently written and inspired-by implementation
-of ROLLOOK (2002, Johan Liljencrants). No original ROLLOOK source code or
-binary is included. ROLLOOK's design and functionality are credited to its
-author.
