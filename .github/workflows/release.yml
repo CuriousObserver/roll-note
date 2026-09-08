@@ -18,11 +18,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-          cache: none
 
       - name: Compile
         run: |
@@ -51,7 +50,7 @@ jobs:
           Compress-Archive -Force -Path build\dist\RollNote -DestinationPath dist\RollNote-windows.zip
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: RollNote-windows
           path: dist/RollNote-windows.zip
@@ -69,11 +68,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
-          cache: none
 
       - name: Compile + package
         run: |
@@ -87,7 +85,7 @@ jobs:
           mkdir -p dist && cd build/dist && zip -qr ../../dist/RollNote-linux.zip RollNote && cd ../..
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: RollNote-linux
           path: dist/RollNote-linux.zip
