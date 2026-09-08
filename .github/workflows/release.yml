@@ -1,0 +1,99 @@
+# Builds the self-contained RollNote distribution and publishes a GitHub
+# Release on each new tag (v*). The release zip needs no JRE installation:
+# a bundled, trimmed JDK 17 runtime + the app, double-click to run.
+name: Build releases
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    name: Windows (RollNote.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: none
+
+      - name: Compile
+        run: |
+          javac -encoding UTF-8 -d out (Get-ChildItem src -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+
+      - name: Jar
+        run: |
+          New-Item -ItemType Directory -Force -Path appinput | Out-Null
+          jar cfe appinput\RollNote.jar rollnote.Main -C out rollnote
+
+      - name: jpackage app image
+        run: |
+          jpackage `
+            --type app-image `
+            --name RollNote `
+            --app-version 1.0 `
+            --vendor "RollNote" `
+            --input appinput `
+            --main-jar RollNote.jar `
+            --main-class rollnote.Main `
+            --add-modules java.base,java.desktop `
+            --dest build\dist
+
+      - name: Zip
+        run: |
+          Compress-Archive -Force -Path build\dist\RollNote -DestinationPath dist\RollNote-windows.zip
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RollNote-windows
+          path: dist/RollNote-windows.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/RollNote-windows.zip
+          generate_release_notes: true
+
+  ubuntu:
+    name: Linux (bin/RollNote)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: none
+
+      - name: Compile + package
+        run: |
+          javac -encoding UTF-8 -d out $(find src -name '*.java')
+          mkdir -p appinput
+          jar cfe appinput/RollNote.jar rollnote.Main -C out rollnote
+          jpackage --type app-image --name RollNote --app-version 1.0 \
+            --vendor "RollNote" --input appinput --main-jar RollNote.jar \
+            --main-class rollnote.Main --add-modules java.base,java.desktop \
+            --dest build/dist
+          mkdir -p dist && cd build/dist && zip -qr ../../dist/RollNote-linux.zip RollNote && cd ../..
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RollNote-linux
+          path: dist/RollNote-linux.zip
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/RollNote-linux.zip

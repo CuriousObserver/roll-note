@@ -1,0 +1,9 @@
+out/
+appinput/
+build/
+dist/
+*.class
+
+# copyrighted/private, not part of the repo
+rollook_capture.mp4
+samples/G2.MID
