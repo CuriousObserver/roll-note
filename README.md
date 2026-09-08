@@ -33,6 +33,13 @@ reachable via its author's historical releases.
 - Pointer readout: note name/number chip, highlighted pitch lane, big status
   readout (the original has none of these — we added them for accessibility)
 
+## Documentation
+
+- **[docs/USER_GUIDE.md](docs/USER_GUIDE.md)** — for the person using the
+  program (plain language, no jargon)
+- **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** — architecture, build,
+  packaging and release notes for maintainers
+
 ## Build from source
 
 ```
