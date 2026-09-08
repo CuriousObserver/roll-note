@@ -47,6 +47,7 @@ jobs:
 
       - name: Zip
         run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
           Compress-Archive -Force -Path build\dist\RollNote -DestinationPath dist\RollNote-windows.zip
 
       - name: Upload artifact
