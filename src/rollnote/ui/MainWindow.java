@@ -23,12 +23,9 @@ import javax.swing.JPanel;
 import javax.swing.JRadioButton;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
-import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
-import javax.swing.border.TitledBorder;
 import javax.swing.filechooser.FileNameExtensionFilter;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -36,13 +33,9 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.Graphics;
-import java.awt.GridLayout;
 import java.awt.event.ActionEvent;
-import java.awt.event.ComponentAdapter;
-import java.awt.event.ComponentEvent;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
-import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayDeque;
@@ -54,6 +47,7 @@ import javax.swing.InputMap;
 
 /** Main application window, organised like the original Rollook form. */
 public class MainWindow extends JFrame implements RollView.Listener {
+    private static final long serialVersionUID = 1L;
     private Song song = new Song();
     private Path currentFile;
     private boolean dirty = false;
@@ -184,6 +178,13 @@ public class MainWindow extends JFrame implements RollView.Listener {
         col.add(buildOpRow("Seq", spinSeq, e -> bulkOp(op -> op.track = spinSeqInt())));
         col.add(buildOpRow("Channel", spinChan, e -> bulkOp(op -> op.channel = spinChanInt())));
         col.add(buildOpRow("Velocity", spinVel, e -> bulkOp(op -> op.velocity = spinVelInt())));
+        // duration preset: length of notes inserted with the pen
+        JPanel penDurRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 1));
+        penDurRow.add(makeBig("Dur"));
+        penDurRow.add(Box.createHorizontalStrut(2));
+        penDurRow.add(spinDur);
+        penDurRow.add(new JLabel(" ticks"));
+        col.add(penDurRow);
 
         JPanel durRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 2, 1));
         durRow.add(makeBig("Duration %"));
@@ -339,6 +340,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
 
     /** The rows of squares to set the status of sequences or channels. */
     private final class MatrixPanel extends JPanel {
+        private static final long serialVersionUID = 1L;
         private boolean channelMode = true;
         private int cells = 16;
         private final Color[] colors = {Color.GRAY, Color.BLACK, Color.RED};
@@ -448,7 +450,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
         changed();
     }
 
-    private static final boolean DEBUG = Boolean.getBoolean("rollook.debug");
+    private static final boolean DEBUG = Boolean.getBoolean("rollnote.debug");
 
     private void debug(String s) { if (DEBUG) System.out.println("[dbg] " + s); }
 
@@ -524,6 +526,8 @@ public class MainWindow extends JFrame implements RollView.Listener {
         redoStack.push(song);
         song = undoStack.pop();
         applySong();
+        dirty = true;
+        refreshAll();
         debug("undo done, notes=" + song.notes.size());
         statusMessage("undo");
     }
@@ -553,6 +557,8 @@ public class MainWindow extends JFrame implements RollView.Listener {
         undoStack.clear();
         redoStack.clear();
         applySong();
+        dirty = false;
+        refreshAll();
         if (currentFile != null)
             setTitle("RollNote - " + currentFile.getFileName());
         statusMessage("loaded " + song.notes.size() + " notes" + note);
@@ -569,7 +575,13 @@ public class MainWindow extends JFrame implements RollView.Listener {
         view.clearHighlightNote();
         player.stop();
         updateMatrixCount();
-        changed();
+    }
+
+    /** refresh model-derived UI without marking the file dirty */
+    private void refreshAll() {
+        view.refreshStats();
+        matrix.repaint();
+        updateStatus();
     }
 
     private boolean confirmOverwriteDisabled() {
@@ -646,6 +658,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
     @Override public void changed() {
         dirty = true;
         view.refreshStats();
+        view.revalidate();     // let the roll grow when edits extend the song
         matrix.repaint();
         updateStatus();
         debug("changed: notes=" + song.notes.size() + " sel=" + song.countSelectedNotes());

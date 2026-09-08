@@ -2,7 +2,7 @@
 
 A modern piano-roll style MIDI editor for Windows/Linux — **inspired by ROLLOOK**.
 
-RollNote is a purpose-built re-implementation of [ROLLOOK], the classic
+RollNote is a purpose-built re-implementation of ROLLOOK, the classic
 piano-roll MIDI editor written in 2002 by **Johan Liljencrants** for
 Windows 3.1. We honour the original: same layout, same note/selection model,
 same colours, so that experienced Rollook users can switch without any
@@ -43,9 +43,13 @@ reachable via its author's historical releases.
 ## Build from source
 
 ```
-./build.sh                # compiles to out/ (JDK 11+)
-./run.sh samples/G2.MID   # or: java -cp out rollnote.Main file.mid
+./build.sh                              # compiles to out/ (JDK 11+)
+./run.sh your-file.mid                  # or: java -cp out rollnote.Main your-file.mid
 ```
+
+> Note: the example `G2.MID` ("Wallace & Gromit" theme, Julian Nott) is
+> copyrighted and therefore not in this repository — open any `.mid` of your
+> own.
 
 ## Self-contained distributions (no install, no JRE needed)
 

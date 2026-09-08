@@ -14,7 +14,7 @@ public final class Main {
                 UIManager.setLookAndFeel(UIManager.getCrossPlatformLookAndFeelClassName());
             } catch (Exception ignored) {}
             MainWindow w = new MainWindow();
-            if (Boolean.getBoolean("rollook.test")) w.setLocation(0, 0);
+            if (Boolean.getBoolean("rollnote.test")) w.setLocation(0, 0);
             if (args.length > 0) {
                 Path p = Path.of(args[0]);
                 if (Files.isReadable(p)) w.loadInitial(p);

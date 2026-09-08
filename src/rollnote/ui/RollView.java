@@ -24,6 +24,7 @@ import java.util.ArrayList;
  * The white strip on the right is the time bar used to set the red marker.
  */
 public class RollView extends JPanel {
+    private static final long serialVersionUID = 1L;
     // geometry
     public static final int CELL = 6;          // pixels per semitone column
     public static final int MARGIN = 18;       // left margin
@@ -186,9 +187,8 @@ public class RollView extends JPanel {
 
         long t0 = tickAtY(Math.max(0, clip.y));
         long t1 = tickAtY(clip.y + clip.height) + 1;
-        double y0 = yForTicks(t0);
 
-        paintPitchField(gr, t0, t1, y0, clip);
+        paintPitchField(gr, t0, t1, clip);
         paintNotes(gr, clip, t0, t1);
         paintHistogram(gr);
         paintRuler(gr, clip);
@@ -197,7 +197,7 @@ public class RollView extends JPanel {
     }
 
     /** background column shades + time grid */
-    private void paintPitchField(Graphics2D gr, long t0, long t1, double yStart, Rectangle clip) {
+    private void paintPitchField(Graphics2D gr, long t0, long t1, Rectangle clip) {
         int x0 = MARGIN;
         // black key columns
         for (int n = 0; n < 128; n++) {
@@ -552,13 +552,14 @@ public class RollView extends JPanel {
         }
         if (e.isShiftDown() && song.countSelectedNotes() > 0) {  // drag whole selection
             mode = MOVE_ALL;
-            pressTick = tickAtY(y);
+            pressTick = quantize(tickAtY(y));
             pressNote = noteAtX(x);
             snapshotSelection();
             return;
         }
         Note hit = noteAt(x, y);
-        if (hit == null) {
+        if (hit == null || !hit.enabled) {
+            // empty paper or a disabled (gray) note: start a rectangle selection
             if (!e.isControlDown()) {
                 song.clearSelection();
                 listener.changed();
@@ -567,24 +568,22 @@ public class RollView extends JPanel {
             rect = new Rectangle2D.Double(x, y, 0, 0);
             return;
         }
-        // pressed on a note
-        if (hit.enabled) {
-            if (!hit.selected) {
-                if (!e.isControlDown()) song.clearSelection();
-                hit.selected = true;
-            } else if (e.isControlDown()) {
-                hit.selected = false;
-                listener.changed();
-                mode = NONE;
-                return;
-            }
-            mode = (y - yForTicks(hit.start)) < (yForTicks(hit.end()) - yForTicks(hit.start)) * 0.45
-                    ? MOVE : DUR;
-            pressTick = tickAtY(y);
-            pressNote = noteAtX(x);
-            snapshotSelection();
+        // pressed on an enabled note
+        if (!hit.selected) {
+            if (!e.isControlDown()) song.clearSelection();
+            hit.selected = true;
+        } else if (e.isControlDown()) {
+            hit.selected = false;
             listener.changed();
+            mode = NONE;
+            return;
         }
+        mode = (y - yForTicks(hit.start)) < (yForTicks(hit.end()) - yForTicks(hit.start)) * 0.45
+                ? MOVE : DUR;
+        pressTick = quantize(tickAtY(y));
+        pressNote = noteAtX(x);
+        snapshotSelection();
+        listener.changed();
     }
 
     private void selectPitch(int note, boolean ctrl) {
@@ -663,21 +662,24 @@ public class RollView extends JPanel {
         long tNow = quantize(tickAtY(y));
         long dt = tNow - pressTick;                 // quantized delta
         if (mode == DUR) {
-            if (dt == 0 && x == lastX) return;
-            pushUndoOnce();
+            if (dt != 0) pushUndoOnce();
+            // absolute end change from the snapshot (as in the original):
+            // the pointer position decides the length, drags back restore it
+            int idx = 0;
             for (Note n : song.notes) {
                 if (!n.selected) continue;
-                // absolute end change (as in the original)
-                n.dur = n.dur + dt;
-                if (n.dur < quantRes) n.dur = quantRes;
-                if (n.dur < 1) n.dur = 1;
+                long[] b = base.get(Math.min(idx, base.size() - 1));
+                idx++;
+                long d = b[2] + dt;
+                if (d < quantRes) d = quantRes;
+                if (d < 1) d = 1;
+                n.dur = d;
             }
             repaint();
             return;
         }
         int dn = (int) Math.round((x - pressX) / (double) CELL);
-        if (dt == 0 && dn == 0) return;
-        pushUndoOnce();
+        if (dt != 0 || dn != 0) pushUndoOnce();
         // apply same delta to every selected note, from their snapshots
         int idx = 0;
         for (Note n : song.notes) {

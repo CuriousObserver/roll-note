@@ -20,7 +20,7 @@ lists, chord analysis, note clipboard, meta dialogs) are folded into dialogs.
 
 ```
 src/rollnote/
-├── Main.java            entry point; optional file arg, rollook.test/rollook.debug flags
+├── Main.java            entry point; optional file arg, rollnote.test/rollnote.debug flags
 ├── core/                no Swing. Pure model + SMF codec.
 │   ├── Song.java        model: division, tempo, notes, ctrl/meta events
 │   ├── Note.java        note record (pitch, vel, start, dur, channel, track, selected, enabled)
@@ -62,7 +62,7 @@ Plain `javac`; no build system needed.
 ./run.sh samples/G2.MID                  # run (or: java -cp out rollnote.Main file.mid)
 ```
 
-Requires JDK 11+ to run. Set `-Drollook.debug=true` to see operation logging.
+Requires JDK 11+ to run. Set `-Drollnote.debug=true` to see operation logging.
 
 ## Packaging (no-install app images)
 

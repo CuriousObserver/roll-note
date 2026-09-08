@@ -16,6 +16,7 @@ public final class Smf {
     private Smf() {}
 
     public static final class FormatException extends Exception {
+        private static final long serialVersionUID = 1L;
         public FormatException(String m) { super(m); }
     }
 
@@ -25,9 +26,10 @@ public final class Smf {
         R r = new R(b);
         if (r.tag(4) != 0x4D546864) throw new FormatException("not an MThd file");
         long hlen = r.u32();
-        int format = (int) r.u16();
-        int ntrks = (int) r.u16();
-        int division = (int) r.u16();
+        if (hlen < 6) throw new FormatException("bad MThd header length " + hlen);
+        int format = r.u16();
+        int ntrks = r.u16();
+        int division = r.u16();
         if ((division & 0x8000) != 0) throw new FormatException("SMPTE division not supported");
         if (format != 0 && format != 1) throw new FormatException("format " + format + " not supported");
         r.skip(hlen - 6);
@@ -70,6 +72,7 @@ public final class Smf {
                     metas.add(new MetaEvent(t, time, type, data));
                     trackEnd = time;
                 } else if (st == 0xF0 || st == 0xF7) {  // sysex kept like a meta record
+                    running = 0;                        // sysex cancels running status (SMF spec)
                     int slen = (int) r.vlq();
                     byte[] data = r.bytes(slen);
                     metas.add(new MetaEvent(t, time, st, data));
@@ -153,8 +156,14 @@ public final class Smf {
                 trkEvents.get(trk).add(new Ev(c.time, 2, chan, hi, c.d1, c.d2));
         }
         boolean keepMetaTracks = (format == 1) && !trackIsChannel;
+        boolean nameKept = false;
         for (MetaEvent m : s.metas) {
             if (m.type == 0x2F) continue;
+            if (m.type == 0x03) {
+                if (keepMetaTracks) { /* keep per track */ }
+                else if (!nameKept) { nameKept = true; }
+                else continue;    // merging/splitting: only the first track name survives
+            }
             int trk = (format == 1 && keepMetaTracks) ? Math.min(m.track, ntrks - 1) : 0;
             trkEvents.get(trk).add(new Ev(m.time, 1, m.type, m.data));
         }

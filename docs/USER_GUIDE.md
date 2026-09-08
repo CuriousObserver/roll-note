@@ -168,7 +168,7 @@ single event exactly.
 
 - The little **0**, **Zoom −**, **Zoom +** buttons (bottom of the left column)
   move to the start and make the roll bigger/smaller.
-- The **H**ide note readout under the cursor speaks out loud: point at a note
+- The note readout under the cursor speaks out loud: point at a note
   and read the little black bar — e.g. `C4  note 60 (0x3C)` — and the big blue
   text bottom-right.
 - **Ctrl+Z** undoes almost anything. If you are not sure, press it first!

@@ -46,9 +46,11 @@ public final class Player {
             // open a synthesizer (Gervill GM soft synth on this system)
             Synthesizer sy = MidiSystem.getSynthesizer();
             sy.open();
-            // make sure volume controller 7 is at max so the notes are audible
+            synth = sy;      // assigned immediately so a later failure still closes it
+            // raise each channel's volume controller 7 so the notes are audible
             try {
-                sy.getReceiver().send(new ShortMessage(ShortMessage.CONTROL_CHANGE, 0, 7, 127), -1);
+                for (int ch = 0; ch < 16; ch++)
+                    sy.getReceiver().send(new ShortMessage(ShortMessage.CONTROL_CHANGE, ch, 7, 127), -1);
             } catch (Exception ignored) {}
 
             Sequencer s = MidiSystem.getSequencer(false);
@@ -58,7 +60,6 @@ public final class Player {
             s.setTempoFactor((float) speedFactor);
             baseTick = fromTick;
             seq = s;
-            synth = sy;
             s.start();
             timer = new Timer(80, e -> {
                 if (seq == null || !seq.isRunning()) {

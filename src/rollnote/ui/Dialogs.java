@@ -156,17 +156,21 @@ public final class Dialogs {
         JButton del = new JButton("Delete");
         JButton close = new JButton("Close");
         close.addActionListener(e -> owner.dispose());
-        edit.addActionListener(e -> {
+        Runnable editSelected = () -> {
             int i = list.getSelectedIndex();
             if (i < 0) return;
             cb.pushUndo();
-            int before = itemCount(song);
             Object it = itemAt(song, i);
             boolean removed = editItem(owner, song, it);
             if (removed) removeItem(song, it);
             cb.changed();
             refreshList(song, m, head);
-            if (before != itemCount(song)) { /* keep simple */ }
+        };
+        edit.addActionListener(e -> editSelected.run());
+        list.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) editSelected.run();
+            }
         });
         del.addActionListener(e -> {
             int i = list.getSelectedIndex();
@@ -195,7 +199,7 @@ public final class Dialogs {
         JButton del = new JButton("Delete");
         JButton close = new JButton("Close");
         close.addActionListener(e -> owner.dispose());
-        edit.addActionListener(e -> {
+        Runnable editSelected = () -> {
             int i = list.getSelectedIndex();
             if (i < 0) return;
             cb.pushUndo();
@@ -203,6 +207,12 @@ public final class Dialogs {
             editMeta(owner, song, it);
             cb.changed();
             refreshMeta(song, m, head);
+        };
+        edit.addActionListener(e -> editSelected.run());
+        list.addMouseListener(new MouseAdapter() {
+            @Override public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) editSelected.run();
+            }
         });
         del.addActionListener(e -> {
             int i = list.getSelectedIndex();
@@ -250,9 +260,14 @@ public final class Dialogs {
         List<Object> out = new ArrayList<>(s.notes.size() + s.ctrls.size());
         out.addAll(s.notes);
         out.addAll(s.ctrls);
+        // the original keeps one time-sorted array of all events
+        out.sort((a, b) -> {
+            long ta = a instanceof Note ? ((Note) a).start : ((CtrlEvent) a).time;
+            long tb = b instanceof Note ? ((Note) b).start : ((CtrlEvent) b).time;
+            return Long.compare(ta, tb);
+        });
         return out;
     }
-    private static int itemCount(Song s) { return s.notes.size() + s.ctrls.size(); }
     private static Object itemAt(Song s, int i) {
         if (i < s.notes.size()) return s.notes.get(i);
         return s.ctrls.get(i - s.notes.size());
