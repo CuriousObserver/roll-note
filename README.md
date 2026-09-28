@@ -29,7 +29,8 @@ reachable via its author's historical releases.
 - Black-bar note histogram + keyboard at the top, channel matrix row
   ("All 0..F") above it
 - Coloured note-mark tabs above the keyboard (Tools → Note marks), stored in
-  the original's `rollnot.txt` format and loaded automatically
+  the original's `rollnot.txt` format and loaded automatically; releases ship
+  a `rollnot.txt.example` demo file
 - Mouse editing: click/rectangle/histogram selection, Ctrl XOR, Shift drag,
   upper-half move, lower-half duration, pen insertion
 - Bulk ops: Seq, Channel, Velocity, Duration scale, Transpose

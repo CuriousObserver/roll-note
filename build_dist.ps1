@@ -34,6 +34,7 @@ jpackage `
 Write-Host "Zipping..."
 Remove-Item -Recurse -Force dist -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Path dist | Out-Null
+Copy-Item rollnot.txt.example build\dist\RollNote\rollnot.txt.example -Force
 Compress-Archive -Force -Path build/dist/RollNote -DestinationPath dist/RollNote-windows.zip
 Write-Host "DONE: dist\RollNote-windows.zip"
 Write-Host "  -> unzip, double-click  RollNote\RollNote.exe"

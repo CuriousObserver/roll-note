@@ -50,6 +50,7 @@ jobs:
       - name: Zip
         run: |
           New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Copy-Item rollnot.txt.example build\dist\RollNote\rollnot.txt.example -Force
           Compress-Archive -Force -Path build\dist\RollNote -DestinationPath dist\RollNote-windows.zip
 
       - name: Upload artifact
@@ -86,6 +87,7 @@ jobs:
             --vendor "RollNote" --input appinput --main-jar RollNote.jar \
             --main-class rollnote.Main --add-modules java.base,java.desktop \
             --dest build/dist
+          cp rollnot.txt.example build/dist/RollNote/rollnot.txt.example
           mkdir -p dist && cd build/dist && zip -qr ../../dist/RollNote-linux.zip RollNote && cd ../..
 
       - name: Upload artifact

@@ -62,6 +62,12 @@ menu item) when you are done — RollNote then asks whether to save. The tabs ar
 kept in `rollnot.txt` in your home directory (the same file the original
 program uses) and are loaded automatically when RollNote starts.
 
+The release includes a demo file, **`rollnot.txt.example`**, next to the
+program: copy it to `rollnot.txt` in your home directory, then adjust the
+tabs. Each of its 128 lines is one note — `note  colour  line` — where colour
+is 0–4 (none, black, red, green, blue) and line is 0–2 (kept from the
+original, not edited yet).
+
 ---
 
 ## Choosing notes

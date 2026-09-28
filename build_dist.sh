@@ -42,6 +42,7 @@ rm -rf build/image build/dist build/zip
 # --- zip it -------------------------------------------------------------
 mkdir -p build/zip dist
 cp -r build/dist/RollNote build/zip/
+cp rollnot.txt.example build/zip/RollNote/rollnot.txt.example
 
 if [ "$(uname)" = Linux ]; then
   OUT=dist/RollNote-linux.zip
