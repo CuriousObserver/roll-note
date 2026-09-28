@@ -1,0 +1,132 @@
+ROLLNOTE — HELP
+===============
+
+RollNote opens MIDI music files (.mid) and shows them as a piano roll -
+a long paper roll, like a player-piano roll:
+
+  - Time runs downward, like a waterfall.
+  - Notes are the black bars on the roll.
+  - The paper is white with thin green lines.
+  - The keyboard and note lanes widen when you enlarge the window,
+    so nothing is wasted on a wide screen.
+
+RollNote is a modern re-creation of the classic ROLLOOK editor by
+Johan Liljencrants (2002). The look and the way of working are the
+same, so experienced Rollook users feel at home.
+
+
+OPENING MUSIC
+
+  1. Start the program: double-click RollNote.
+  2. Menu File -> Open... at the top left.
+  3. Choose your .mid file and press Open.
+
+
+THE SCREEN, TOP TO BOTTOM
+
+  File / Edit / Tools / Help        the menus
+  All  0 1 2 3 4 5 6 7 8 9 A..F     the channel squares (see below)
+  Left column                       T res, P Percussions, Seq, Channel,
+                                    Velocity, Dur, Duration %, Transpose,
+                                    Speed, Play, Stop, Pen, zoom buttons
+  Top of the roll                   the histogram and the keyboard
+  The roll                          your music, time running downward
+  Right white strip                 the time bar (red marker)
+  Bottom line                       status text
+
+
+THE THREE NOTE COLOURS
+
+  Black  the note is on and can be selected.
+  Red    the note is SELECTED (picked for the next operation).
+  Gray   the note is switched off: visible, but ignored by Play,
+         Save and editing.
+
+
+CHOOSING NOTES
+
+  - Click a single note.
+  - Drag a rectangle around a group of notes.
+  - Click a histogram bar on top to choose one whole pitch.
+
+  Holding Ctrl while clicking adds to (or removes from) the selection.
+
+  The channel squares on top switch whole voices:
+  click cycles on -> selected -> off -> on.
+
+
+EDITING NOTES
+
+  Move:    click a note, press on its UPPER half, drag.
+           (With Shift held, the whole selection moves together.)
+  Longer / shorter:
+           click a note, press on its LOWER half, drag up or down.
+           All selected notes change together.
+  Add:     tick the Pen box, then click on the roll where the note
+           should start; drag downward for its length, then release.
+           Untick Pen to go back to selecting. A new note cannot be
+           placed on top of an existing one.
+  Remove:  select the notes, then press the Delete key
+           (or menu Edit -> Cut). Ctrl+Z brings them back.
+  Copy:    select, Edit -> Copy; click the right white time strip
+           where the copy should start (red line marks the spot);
+           Edit -> Paste.
+
+
+THE LEFT COLUMN BUTTONS
+
+They act on all SELECTED (red) notes. Set the number with the little
+arrows, then press the button.
+
+  Seq (number)       moves selected notes to another track
+  Channel (number)   moves selected notes to another voice (0-15)
+  Velocity (number)  sets how loud they are (0-127)
+  Dur (ticks)        length of notes you insert with the Pen
+  Duration % + Scale makes selected notes longer or shorter
+  Transpose + Apply  shifts them up/down (12 = one octave)
+  P Percussions      drum-name list (channel 9)
+  T res (1/1..1/64)  time resolution: how fine things snap
+  Speed, Play, Stop  listening at 1x, 1/2x or 1/4x
+
+
+LISTENING FROM A SPOT
+
+  1. Click the right white time strip to put the red marker where you
+     want to start.
+  2. Press Play. Only black (on) notes are heard; a green line follows
+     the music.
+  3. Press Stop to stop.
+
+If you hear nothing: check the computer volume and speakers. RollNote
+uses the General MIDI sound that the system provides.
+
+
+EVENT LISTS (FINE WORK)
+
+Menu Tools -> Event lists... shows every event in two lists. Press
+Edit... (or double-click an item) to change one event exactly, with
+Delete / Replace / Insert options.
+
+
+SAVING
+
+  File -> Save      writes back into the same file.
+  File -> Save As.. choose how the file is written (keep or rearrange
+                    tracks and channels). The window explains the options.
+  Notes switched off (gray) are NOT saved; you will be warned.
+
+
+TIPS
+
+  - 0, Zoom -, Zoom +   go to the start, make the roll smaller/bigger.
+  - Point at a note: the black chip next to the cursor names it
+    (e.g. C4  note 60 (0x3C)), and the big blue text bottom-right
+    says the same.
+  - Ctrl+Z undoes almost anything. If unsure, press it first!
+  - The keyboard, note lanes and labels grow with the window.
+
+
+CREDIT
+
+RollNote is an independent, modern re-creation of ROLLOOK (2002) by
+Johan Liljencrants, who is gratefully credited for the design.

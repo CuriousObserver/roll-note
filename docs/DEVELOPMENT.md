@@ -66,8 +66,8 @@ Key behaviors worth keeping an eye on when extending:
 Plain `javac`; no build system needed.
 
 ```
-./build.sh                               # compile -> out/
-./run.sh samples/G2.MID                  # run (or: java -cp out rollnote.Main file.mid)
+./build.sh                               # compile -> out/ (also copies help.txt)
+./run.sh your-file.mid                   # run (or: java -cp out rollnote.Main file.mid)
 ```
 
 Requires JDK 11+ to run. Set `-Drollnote.debug=true` to see operation logging.
@@ -112,10 +112,9 @@ only does a compile + packaging build, not UI tests.
 ## Sample data
 
 `samples/` and non-source assets are intentionally **not** in the repo:
-`G2.MID` ("Wallace & Gromit" theme) and `rollook_capture.mp4` are copyrighted
-and excluded via `.gitignore`.
+copyrighted recordings and any screenshots/videos are excluded via
+`.gitignore`.
 
 ## Inspirations & credits
 
 - Johan Liljencrants — ROLLOOK (2002), design reference
-- Julian Nott — G2.MID example

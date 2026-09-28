@@ -26,6 +26,8 @@ jobs:
       - name: Compile
         run: |
           javac -encoding UTF-8 -d out (Get-ChildItem src -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+          New-Item -ItemType Directory -Force -Path out\rollnote | Out-Null
+          Copy-Item src\rollnote\help.txt out\rollnote\help.txt -Force
 
       - name: Jar
         run: |
@@ -77,6 +79,7 @@ jobs:
       - name: Compile + package
         run: |
           javac -encoding UTF-8 -d out $(find src -name '*.java')
+          mkdir -p out/rollnote && cp src/rollnote/help.txt out/rollnote/help.txt
           mkdir -p appinput
           jar cfe appinput/RollNote.jar rollnote.Main -C out rollnote
           jpackage --type app-image --name RollNote --app-version 1.0 \

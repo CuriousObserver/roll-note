@@ -52,9 +52,6 @@ reachable via its author's historical releases.
 ./run.sh your-file.mid                  # or: java -cp out rollnote.Main your-file.mid
 ```
 
-> Note: the example `G2.MID` ("Wallace & Gromit" theme, Julian Nott) is
-> copyrighted and therefore not in this repository — open any `.mid` of your
-> own.
 
 ## Self-contained distributions (no install, no JRE needed)
 
@@ -76,4 +73,3 @@ Liljencrants) is not reproduced here; RollNote is clean-room inspired work.
 ## Credits
 
 - Johan Liljencrants — ROLLOOK (2002), whose design RollNote follows
-- Julian Nott — the G2.MID example ("Wallace & Gromit" theme)

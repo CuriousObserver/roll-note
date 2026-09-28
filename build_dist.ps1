@@ -10,6 +10,8 @@ Set-Location $PSScriptRoot
 
 Write-Host "Compiling..."
 javac -encoding UTF-8 -d out (Get-ChildItem src -Recurse -Filter *.java | ForEach-Object { $_.FullName })
+New-Item -ItemType Directory -Force -Path out\rollnote | Out-Null
+Copy-Item src\rollnote\help.txt out\rollnote\help.txt -Force
 
 Write-Host "Building jar..."
 Remove-Item -Recurse -Force appinput -ErrorAction SilentlyContinue

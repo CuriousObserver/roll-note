@@ -14,7 +14,8 @@ public class ResizeProbe {
             MainWindow w = new MainWindow();
             w.setLocation(0, 0);
             w.setSize(2200, 1200);
-            w.loadInitial(Path.of("/home/jon/Downloads/rollook/G2.MID"));
+            if (a.length > 0 && Files.isReadable(Path.of(a[0])))
+                w.loadInitial(Path.of(a[0]));
             w.setVisible(true);
         });
         Thread.sleep(2500);

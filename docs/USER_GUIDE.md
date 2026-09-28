@@ -181,5 +181,4 @@ single event exactly.
 ## Credit
 
 RollNote is an independent, modern re-creation of **ROLLOOK** (2002) by
-**Johan Liljencrants**. The example song (G2.MID) is "Wallace & Gromit" theme
-by Julian Nott.
+**Johan Liljencrants**.

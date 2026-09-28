@@ -18,6 +18,7 @@ if [ "$(uname)" = Linux ]; then
   ./build.sh
 else
   javac -encoding UTF-8 -d out $(printf '%s ' $(find src -name '*.java'))
+  mkdir -p out/rollnote && cp src/rollnote/help.txt out/rollnote/help.txt
 fi
 
 # --- jar the application ------------------------------------------------

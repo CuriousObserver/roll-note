@@ -310,14 +310,41 @@ public class MainWindow extends JFrame implements RollView.Listener {
         bar.add(tools);
 
         JMenu help = new JMenu("Help");
+        help.add(mi("User Guide...", 0, 0, e -> showHelpDialog()));
         help.add(mi("About", 0, 0, e -> JOptionPane.showMessageDialog(this,
                 "RollNote\n"
                 + "A modern piano-roll style MIDI editor.\n\n"
                 + "Forthrightly inspired by ROLLOOK (2002) by Johan Liljencrants;\n"
-                + "we keep its look and editing model so longtime users feel at home.\n"
-                + "G2.MID example by Julian Nott.")));
+                + "we keep its look and editing model so longtime users feel at home.")));
         bar.add(help);
         return bar;
+    }
+
+    /** bundled plain-text user guide, shown in a scrollable window */
+    private void showHelpDialog() {
+        String text;
+        try (java.io.InputStream in = MainWindow.class.getResourceAsStream("/rollnote/help.txt")) {
+            if (in == null) throw new java.io.IOException("help.txt not found");
+            text = new String(in.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
+        } catch (Exception ex) {
+            text = "Help text is missing from this installation.\n\n"
+                    + "See docs/USER_GUIDE.md in the project sources.";
+        }
+        javax.swing.JTextArea ta = new javax.swing.JTextArea(text, 28, 86);
+        ta.setEditable(false);
+        ta.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 13));
+        ta.setCaretPosition(0);
+        javax.swing.JDialog d = new javax.swing.JDialog(this, "RollNote - User Guide", false);
+        d.setLayout(new BorderLayout());
+        d.add(new JScrollPane(ta), BorderLayout.CENTER);
+        JButton close = new JButton("Close");
+        close.addActionListener(e -> d.dispose());
+        JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        south.add(close);
+        d.add(south, BorderLayout.SOUTH);
+        d.setSize(760, 640);
+        d.setLocationRelativeTo(this);
+        d.setVisible(true);
     }
 
     private JMenuItem mi(String name, int key, int mod, java.awt.event.ActionListener a) {
