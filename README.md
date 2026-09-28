@@ -21,6 +21,8 @@ reachable via its author's historical releases.
   fused on/off records
 - Paper-roll display: white paper, green pitch lanes, time running downward,
   black enabled notes, red selected, gray disabled
+- The pitch axis (keyboard, histogram, lanes) stretches to fit the window
+  width, 4–16 px per semitone — no wasted space on wide monitors
 - Black-bar note histogram + keyboard at the top, channel matrix row
   ("All 0..F") above it
 - Mouse editing: click/rectangle/histogram selection, Ctrl XOR, Shift drag,

@@ -35,6 +35,10 @@ src/rollnote/
     ├── RollView.java    the painter + all mouse gestures (select, rect, Ctrl-XOR,
     │                    Shift-drag, move/duration, pen insert, marker, play line,
     │                    hover chip/lane highlight, histogram & keyboard)
+    │                    Lane width re-fits to the view width on resize
+    │                    (MIN_CELL..MAX_CELL px/semitone); the time ruler absorbs
+    │                    any leftover width. Implements Scrollable so the view
+    │                    tracks the viewport width (no horizontal scrollbar).
     ├── Player.java      javax.sound.midi playback: slice from marker, enabled
     │                    channels only, earlier events forced to time 0; Gervill
     │                    synth is connected explicitly (no receiver bug!)

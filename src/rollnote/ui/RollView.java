@@ -4,6 +4,7 @@ import rollnote.core.Note;
 import rollnote.core.Song;
 
 import javax.swing.JPanel;
+import javax.swing.Scrollable;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
@@ -12,6 +13,8 @@ import java.awt.FontMetrics;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.awt.geom.Rectangle2D;
@@ -22,16 +25,22 @@ import java.util.ArrayList;
  * pitch on the horizontal axis (bass at the left, like a paper roll), time
  * running downward. The top area holds the note histogram and the keyboard.
  * The white strip on the right is the time bar used to set the red marker.
+ *
+ * The pitch axis (keyboard, histogram, lanes) stretches with the window
+ * width: the lane width is re-fitted on every resize within
+ * {@link #MIN_CELL}..{@link #MAX_CELL} pixels per semitone.
  */
-public class RollView extends JPanel {
+public class RollView extends JPanel implements Scrollable {
     private static final long serialVersionUID = 1L;
     // geometry
-    public static final int CELL = 6;          // pixels per semitone column
     public static final int MARGIN = 18;       // left margin
     public static final int KEY_H = 26;        // keyboard strip height
     public static final int HIST_H = 130;      // histogram bar area height
-    public static final int RULER_W = 96;      // right white time bar
+    public static final int RULER_W = 96;      // minimum right white time bar
     public static final int TOP_H = KEY_H + HIST_H;
+    public static final int MIN_CELL = 4;      // px per semitone, tightest fit
+    public static final int MAX_CELL = 16;     // px per semitone, widest fit
+    public int cell = 6;                       // px per semitone (re-fitted on resize)
 
     private static final Color BG = new Color(0xFDFEFA);
     private static final Color COL_PAPER = new Color(0xFDFEFA);
@@ -82,6 +91,9 @@ public class RollView extends JPanel {
         this.listener = listener;
         setBackground(BG);
         setPxPerQuarter(34.0);
+        addComponentListener(new ComponentAdapter() {
+            @Override public void componentResized(ComponentEvent e) { refit(); }
+        });
         MouseAdapter m = new MouseAdapter() {
             @Override public void mousePressed(MouseEvent e) { doPress(e); }
             @Override public void mouseDragged(MouseEvent e) { doDrag(e); }
@@ -92,6 +104,28 @@ public class RollView extends JPanel {
         addMouseListener(m);
         addMouseMotionListener(m);
     }
+
+    /** re-fit the lane width to the current view width (min/max capped) */
+    public void refit() {
+        int w = getWidth();
+        if (w <= 0) return;
+        int fit = (w - MARGIN - RULER_W) / 128;
+        if (fit < MIN_CELL) fit = MIN_CELL;
+        if (fit > MAX_CELL) fit = MAX_CELL;
+        if (fit != cell) {
+            cell = fit;
+            revalidate();
+            repaint();
+        }
+    }
+
+    // ---------------------------------------------------------------- Scrollable
+
+    @Override public Dimension getPreferredScrollableViewportSize() { return getPreferredSize(); }
+    @Override public int getScrollableUnitIncrement(Rectangle r, int o, int d) { return 40; }
+    @Override public int getScrollableBlockIncrement(Rectangle r, int o, int d) { return 200; }
+    @Override public boolean getScrollableTracksViewportWidth() { return true; }
+    @Override public boolean getScrollableTracksViewportHeight() { return false; }
 
     public void setSong(Song song) { this.song = song; statsDirty = true; revalidate(); repaint(); }
 
@@ -140,10 +174,12 @@ public class RollView extends JPanel {
 
     // ---- geometry -----------------------------------------------------
 
-    private int rollW() { return MARGIN + 128 * CELL; }        // note field width
-    private int contentW() { return rollW() + RULER_W; }
-    private int xFor(int note) { return MARGIN + note * CELL; }
-    private int noteAtX(int x) { return Math.max(0, Math.min(127, (x - MARGIN) / CELL)); }
+    private int rollW() { return MARGIN + 128 * cell; }        // note field width
+    /** ruler width: at least RULER_W, extending to the view edge when lanes hit the cap */
+    private int rulerW() { return Math.max(RULER_W, getWidth() - rollW()); }
+    private int contentW() { return rollW() + rulerW(); }
+    private int xFor(int note) { return MARGIN + note * cell; }
+    private int noteAtX(int x) { return Math.max(0, Math.min(127, (x - MARGIN) / cell)); }
 
     private double yForTicks(long t) { return TOP_H + t * pxPerTick; }
     private long tickAtY(double y) { return (long) Math.floor(Math.max(0, y - TOP_H) / pxPerTick); }
@@ -204,7 +240,7 @@ public class RollView extends JPanel {
             int m = n % 12;
             if (m == 1 || m == 3 || m == 6 || m == 8 || m == 10) {
                 gr.setColor(COL_BLACKKEY);
-                gr.fillRect(xFor(n), clip.y, CELL, clip.height);
+                gr.fillRect(xFor(n), clip.y, cell, clip.height);
             }
             if (m == 0) {
                 gr.setColor(COL_OCTAVE);
@@ -221,13 +257,13 @@ public class RollView extends JPanel {
         for (; b <= t1; b += song.division) {
             if (b % barLen == 0) continue;
             double yy = yForTicks(b);
-            gr.drawLine(x0, (int) yy, x0 + 128 * CELL, (int) yy);
+            gr.drawLine(x0, (int) yy, x0 + 128 * cell, (int) yy);
         }
         // bars
         gr.setColor(COL_BAR);
         for (long bb = bar0 * barLen; bb <= t1; bb += barLen) {
             double yy = yForTicks(bb);
-            gr.drawLine(x0, (int) yy, x0 + 128 * CELL, (int) yy);
+            gr.drawLine(x0, (int) yy, x0 + 128 * cell, (int) yy);
         }
         // faint per-note vertical lines
         gr.setColor(COL_GRID);
@@ -250,9 +286,9 @@ public class RollView extends JPanel {
                 if (ye - ys < 1.6) ye = ys + 1.6;           // minimum visual height
                 gr.setColor(c);
                 int x = xFor(n.note) + 1;
-                gr.fillRect(x, (int) ys, CELL - 1, Math.max(1, (int) (ye - ys)));
+                gr.fillRect(x, (int) ys, cell - 1, Math.max(1, (int) (ye - ys)));
                 gr.setColor(c.darker());
-                gr.drawRect(x, (int) ys, CELL - 1, Math.max(1, (int) (ye - ys)));
+                gr.drawRect(x, (int) ys, cell - 1, Math.max(1, (int) (ye - ys)));
             }
         }
     }
@@ -284,17 +320,17 @@ public class RollView extends JPanel {
             if (statDis[n] > 0) {
                 int h = Math.max(1, (int) ((long) statDis[n] * barH / max));
                 gr.setColor(new Color(0xC8C8C8));
-                gr.fillRect(x, baseline - h, CELL - 1, h);
+                gr.fillRect(x, baseline - h, cell - 1, h);
             }
             if (statEn[n] > 0) {
                 int h = Math.max(1, (int) ((long) statEn[n] * barH / max));
                 gr.setColor(Color.BLACK);
-                gr.fillRect(x, baseline - h, CELL - 1, h);
+                gr.fillRect(x, baseline - h, cell - 1, h);
             }
             if (statSel[n] > 0) {
                 int h = Math.max(1, (int) ((long) statSel[n] * barH / max));
                 gr.setColor(COL_SELECTED);
-                gr.fillRect(x, baseline - h, CELL - 1, h);
+                gr.fillRect(x, baseline - h, cell - 1, h);
             }
         }
         // keyboard strip at the bottom of the top region (white/black piano style)
@@ -303,15 +339,15 @@ public class RollView extends JPanel {
             boolean black = (m == 1 || m == 3 || m == 6 || m == 8 || m == 10);
             if (black) {
                 gr.setColor(new Color(0x1A1A1A));
-                gr.fillRect(xFor(n), baseline + 2, CELL, KEY_H - 2);
+                gr.fillRect(xFor(n), baseline + 2, cell, KEY_H - 2);
             } else {
                 gr.setColor(Color.WHITE);
-                gr.fillRect(xFor(n), baseline, CELL, KEY_H);
+                gr.fillRect(xFor(n), baseline, cell, KEY_H);
             }
         }
         gr.setColor(new Color(0x202020));
-        gr.drawLine(MARGIN, baseline, MARGIN + 128 * CELL, baseline);
-        gr.drawLine(MARGIN, baseline + KEY_H, MARGIN + 128 * CELL, baseline + KEY_H);
+        gr.drawLine(MARGIN, baseline, MARGIN + 128 * cell, baseline);
+        gr.drawLine(MARGIN, baseline + KEY_H, MARGIN + 128 * cell, baseline + KEY_H);
         // octave separators drawn through keyboard
         for (int n = 0; n < 128; n += 12) {
             gr.drawLine(xFor(n), baseline + 1, xFor(n), baseline + KEY_H - 1);
@@ -319,7 +355,7 @@ public class RollView extends JPanel {
         // highlight column from percussion picker
         if (highlighted >= 0) {
             gr.setColor(new Color(255, 0, 0, 60));
-            gr.fillRect(xFor(highlighted), 0, CELL, TOP_H);
+            gr.fillRect(xFor(highlighted), 0, cell, TOP_H);
         }
     }
 
@@ -329,8 +365,9 @@ public class RollView extends JPanel {
 
     private void paintRuler(Graphics2D gr, Rectangle clip) {
         int rx = rollW();
+        int rw = rulerW();
         gr.setColor(new Color(0xFAFAF7));
-        gr.fillRect(rx, clip.y, RULER_W, clip.height);
+        gr.fillRect(rx, clip.y, rw, clip.height);
         gr.setColor(COL_GRID);
         gr.drawLine(rx, clip.y, rx, clip.y + clip.height);
 
@@ -376,7 +413,7 @@ public class RollView extends JPanel {
             gr.setColor(COL_MARKER);
             gr.drawLine(0, (int) my, contentW(), (int) my);
             // little handle on the ruler
-            gr.fillRect(rollW(), (int) my - 2, RULER_W, 4);
+            gr.fillRect(rollW(), (int) my - 2, rulerW(), 4);
         }
         // play line (green)
         if (playTick >= 0) {
@@ -389,14 +426,14 @@ public class RollView extends JPanel {
                 && mx < rollW()) {
             int lx = xFor(hoverCol);
             gr.setColor(new Color(30, 90, 220, 36));
-            gr.fillRect(lx, TOP_H, CELL, Math.max(0, getHeight() - TOP_H));
+            gr.fillRect(lx, TOP_H, cell, Math.max(0, getHeight() - TOP_H));
             if (hoverNote != null) {
                 double ys = yForTicks(hoverNote.start);
                 double ye = yForTicks(hoverNote.end());
                 if (ye - ys < 1.6) ye = ys + 1.6;
                 gr.setColor(new Color(0xFF8C00));
                 gr.setStroke(new java.awt.BasicStroke(1.4f));
-                gr.drawRect(lx, (int) ys - 1, CELL - 1, Math.max(1, (int) (ye - ys)) + 2);
+                gr.drawRect(lx, (int) ys - 1, cell - 1, Math.max(1, (int) (ye - ys)) + 2);
                 gr.setStroke(new java.awt.BasicStroke(1f));
             }
         }
@@ -454,7 +491,7 @@ public class RollView extends JPanel {
     private void updatePointer(int x, int y) {
         mx = x; my = y;
         String h = "";
-        if (x >= MARGIN && x < MARGIN + 128 * CELL && y >= TOP_H) {
+        if (x >= MARGIN && x < MARGIN + 128 * cell && y >= TOP_H) {
             hoverCol = noteAtX(x);
             hoverTick = Math.max(0, tickAtY(y));
             Note n = noteAt(x, y);
@@ -678,7 +715,7 @@ public class RollView extends JPanel {
             repaint();
             return;
         }
-        int dn = (int) Math.round((x - pressX) / (double) CELL);
+        int dn = (int) Math.round((x - pressX) / (double) cell);
         if (dt != 0 || dn != 0) pushUndoOnce();
         // apply same delta to every selected note, from their snapshots
         int idx = 0;

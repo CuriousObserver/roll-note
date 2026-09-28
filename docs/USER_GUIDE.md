@@ -168,6 +168,8 @@ single event exactly.
 
 - The little **0**, **Zoom −**, **Zoom +** buttons (bottom of the left column)
   move to the start and make the roll bigger/smaller.
+- The **keyboard and note lanes widen by themselves** when you make the window
+  bigger (up to a comfortable maximum), so on a wide screen nothing is wasted.
 - The note readout under the cursor speaks out loud: point at a note
   and read the little black bar — e.g. `C4  note 60 (0x3C)` — and the big blue
   text bottom-right.
