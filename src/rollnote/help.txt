@@ -43,6 +43,25 @@ THE THREE NOTE COLOURS
          Save and editing.
 
 
+NOTE MARKS (THE COLOURED TABS ABOVE THE KEYBOARD)
+
+The little coloured tabs between the histogram and the keyboard show
+which notes the instrument actually has. A histogram bar without a tab
+is a forbidden note for that instrument; click the bar to select those
+notes (they go red in the display).
+
+To change the tabs: menu Tools -> Note marks (edit tabs). A yellow
+strip appears; while it is showing, click the histogram to change a
+tab colour:
+
+  none -> black -> red -> green -> blue -> none
+
+Press Esc (or untick the menu item) when done. If you changed anything,
+RollNote asks whether to save. The tabs are kept in rollnot.txt in
+your home directory - the same file and format the original program
+uses - and are loaded automatically when RollNote starts.
+
+
 CHOOSING NOTES
 
   - Click a single note.

@@ -19,6 +19,7 @@ public class ScrollTest {
                 @Override public void hover(String s) {}
                 @Override public void pointerHover(int n, long t) {}
                 @Override public void markerChanged(long t) {}
+                @Override public void noteMarkClicked(int n) {}
             });
             JFrame f1 = new JFrame();
             JScrollPane sp1 = new JScrollPane(empty);
@@ -38,6 +39,7 @@ public class ScrollTest {
                 @Override public void hover(String s) {}
                 @Override public void pointerHover(int n, long t) {}
                 @Override public void markerChanged(long t) {}
+                @Override public void noteMarkClicked(int n) {}
             });
             JFrame f2 = new JFrame();
             JScrollPane sp2 = new JScrollPane(longv);

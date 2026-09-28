@@ -3,6 +3,7 @@ package rollnote.ui;
 import rollnote.core.CtrlEvent;
 import rollnote.core.MetaEvent;
 import rollnote.core.Note;
+import rollnote.core.NoteMarks;
 import rollnote.core.Smf;
 import rollnote.core.Song;
 
@@ -12,6 +13,7 @@ import javax.swing.BoxLayout;
 import javax.swing.ButtonGroup;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
+import javax.swing.JCheckBoxMenuItem;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
@@ -95,6 +97,16 @@ public class MainWindow extends JFrame implements RollView.Listener {
     private final JRadioButton speedHalf = new JRadioButton("1/2x");
     private final JRadioButton speedQuarter = new JRadioButton("1/4x");
 
+    // note marks (coloured tabs above the keyboard), original rollnot.txt format
+    private final NoteMarks marks = new NoteMarks();
+    private Path marksPath;
+    private boolean marksDirty;
+    private boolean marksGuard;
+    private JCheckBoxMenuItem marksItem;
+    private JPanel marksBanner;
+    private byte[] marksColorBackup = new byte[128];
+    private byte[] marksLineBackup = new byte[128];
+
     private static final int[] RES_DENOMS = {1, 2, 4, 8, 16, 32, 64};
 
     public MainWindow() {
@@ -108,7 +120,11 @@ public class MainWindow extends JFrame implements RollView.Listener {
 
         JPanel root = new JPanel(new BorderLayout(4, 4));
         root.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
-        root.add(buildTopRow(), BorderLayout.NORTH);
+        JPanel north = new JPanel();
+        north.setLayout(new BoxLayout(north, BoxLayout.Y_AXIS));
+        north.add(buildTopRow());
+        north.add(buildMarksBanner());
+        root.add(north, BorderLayout.NORTH);
         root.add(buildWest(), BorderLayout.WEST);
         JScrollPane sp = new JScrollPane(view);
         sp.getVerticalScrollBar().setUnitIncrement(40);
@@ -116,6 +132,9 @@ public class MainWindow extends JFrame implements RollView.Listener {
         root.add(sp, BorderLayout.CENTER);
         root.add(buildStatus(), BorderLayout.SOUTH);
         add(root);
+
+        view.setMarks(marks);
+        loadMarksAtStartup();
 
         setJMenuBar(buildMenus());
         bindKeys(root);
@@ -127,6 +146,20 @@ public class MainWindow extends JFrame implements RollView.Listener {
     }
 
     // ------------------------------------------------------------ left rail
+
+    /** yellow reminder strip shown while the note-marks editing mode is on */
+    private JPanel buildMarksBanner() {
+        marksBanner = new JPanel(new FlowLayout(FlowLayout.LEFT, 8, 3));
+        marksBanner.setBackground(new Color(0xFFF3B0));
+        JLabel l = new JLabel("Note marks editing: click the histogram to change a tab colour"
+                + " (none \u2192 black \u2192 red \u2192 green \u2192 blue)."
+                + "  Press Esc or untick the menu item to finish.");
+        l.setFont(l.getFont().deriveFont(Font.BOLD, 12f));
+        marksBanner.add(l);
+        marksBanner.setVisible(false);
+        marksBanner.setBorder(BorderFactory.createLineBorder(new Color(0xE0C060)));
+        return marksBanner;
+    }
 
     /** channel/sequence squares across the top, like the original's "All 0..F" row */
     private JPanel buildTopRow() {
@@ -307,6 +340,10 @@ public class MainWindow extends JFrame implements RollView.Listener {
                 })));
         tools.add(mi("Percussion names...", 0, 0, e -> Dialogs.showPercussionPicker(this,
                 note -> view.highlightNote(note))));
+        tools.addSeparator();
+        marksItem = new JCheckBoxMenuItem("Note marks (edit tabs)");
+        marksItem.addItemListener(e -> marksToggled());
+        tools.add(marksItem);
         bar.add(tools);
 
         JMenu help = new JMenu("Help");
@@ -360,7 +397,12 @@ public class MainWindow extends JFrame implements RollView.Listener {
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_DELETE, 0), "cut");
         im.put(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "esc");
         am.put("cut", new AbstractAction() { public void actionPerformed(ActionEvent e) { cut(); } });
-        am.put("esc", new AbstractAction() { public void actionPerformed(ActionEvent e) { view.cancelGesture(); } });
+        am.put("esc", new AbstractAction() {
+            public void actionPerformed(ActionEvent e) {
+                if (marksItem.isSelected()) marksItem.setSelected(false);   // finish note-marks editing
+                else view.cancelGesture();
+            }
+        });
     }
 
     // ------------------------------------------------------------ matrix
@@ -567,6 +609,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
         fc.setFileFilter(new FileNameExtensionFilter("MIDI files (*.mid, *.midi)", "mid", "midi"));
         if (currentFile != null) fc.setSelectedFile(currentFile.toFile());
         if (fc.showOpenDialog(this) != JFileChooser.APPROVE_OPTION) return;
+        if (marksItem.isSelected() && !finishMarksEditing()) return;   // editing tabs: keep them first
         Path p = fc.getSelectedFile().toPath();
         if (!Files.isReadable(p)) { error("cannot read " + p); return; }
         try {
@@ -658,6 +701,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
     }
 
     private void quit() {
+        if (marksItem.isSelected() && !finishMarksEditing()) return;   // prompt for unsaved tabs
         if (dirty && JOptionPane.showConfirmDialog(this,
                 "Edited data has not been saved. Quit anyway?",
                 "RollNote", JOptionPane.OK_CANCEL_OPTION) != JOptionPane.OK_OPTION)
@@ -708,6 +752,91 @@ public class MainWindow extends JFrame implements RollView.Listener {
         markerLabel.setText("marker " + song.barBeatTick(tick));
     }
 
+    // ------------------------------------------------------------ note marks
+
+    /** load rollnot.txt from the working or home directory, if present */
+    private void loadMarksAtStartup() {
+        Path p = NoteMarks.find();
+        if (p == null) return;
+        if (marks.load(p)) {
+            marksPath = p;
+            view.repaint();
+            statusMessage("note marks loaded from " + p);
+        } else {
+            statusMessage("could not read note marks from " + p);
+        }
+    }
+
+    private Path marksTargetPath() {
+        return marksPath != null ? marksPath : NoteMarks.defaultPath();
+    }
+
+    /** toggle the note-marks editing mode; prompt to save when finishing */
+    private void marksToggled() {
+        if (marksGuard) return;
+        if (marksItem.isSelected()) {
+            marksDirty = false;
+            System.arraycopy(marks.color, 0, marksColorBackup, 0, 128);
+            System.arraycopy(marks.line, 0, marksLineBackup, 0, 128);
+            view.setMarksMode(true);
+            marksBanner.setVisible(true);
+            revalidate();
+            statusMessage("note marks: click the histogram to change a tab colour");
+        } else {
+            finishMarksEditing();
+        }
+    }
+
+    /** leave the editing mode. Returns false when the user cancelled (still editing). */
+    private boolean finishMarksEditing() {
+        if (marksDirty) {
+            int r = JOptionPane.showOptionDialog(this,
+                    "Save the note marks to\n" + marksTargetPath() + " ?",
+                    "Note marks", JOptionPane.YES_NO_CANCEL_OPTION,
+                    JOptionPane.QUESTION_MESSAGE, null,
+                    new String[]{"Save", "Discard", "Cancel"}, "Save");
+            if (r == JOptionPane.CANCEL_OPTION || r == JOptionPane.CLOSED_OPTION) {
+                marksGuard = true;
+                marksItem.setSelected(true);
+                marksGuard = false;
+                return false;                  // keep editing
+            }
+            if (r == JOptionPane.YES_OPTION) {
+                try {
+                    Path p = marksTargetPath();
+                    marks.save(p);
+                    marksPath = p;
+                    marksDirty = false;
+                    statusMessage("note marks saved to " + p);
+                } catch (Exception ex) {
+                    error("Could not save note marks: " + ex.getMessage());
+                    marksGuard = true;
+                    marksItem.setSelected(true);
+                    marksGuard = false;
+                    return false;              // stay in editing so nothing is lost
+                }
+            } else {
+                // Discard: forget the session's changes (revert to the saved state)
+                System.arraycopy(marksColorBackup, 0, marks.color, 0, 128);
+                System.arraycopy(marksLineBackup, 0, marks.line, 0, 128);
+                view.repaint();
+            }
+        }
+        view.setMarksMode(false);
+        marksBanner.setVisible(false);
+        revalidate();
+        statusMessage("note marks editing finished");
+        return true;
+    }
+
+    @Override public void noteMarkClicked(int note) {
+        marks.cycleColor(note);
+        marksDirty = true;
+        view.repaint();
+        statusMessage("note " + note + " (" + NoteName2.name(note) + "): "
+                + NoteMarks.COLOR_NAMES[marks.color[note]] + " tab");
+    }
+
     // ------------------------------------------------------------ misc
 
     private void statusMessage(String s) { status.setText(s); }
@@ -746,6 +875,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
     }
 
     public void loadInitial(Path p) {
+        if (marksItem.isSelected() && !finishMarksEditing()) return;   // editing tabs: keep them first
         try {
             song = Smf.read(Files.readAllBytes(p));
             currentFile = p;

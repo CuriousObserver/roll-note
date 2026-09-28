@@ -36,7 +36,7 @@ bottom-left.
 |-------|-----------|
 | **File / Edit / Tools / Help** | The menus at the top |
 | **All  0 1 2 3 4 5 6 7 8 9 A B C D E F** | The channel squares. **Click one** to check which voices are switched on, off, or selected (see below) |
-| **Left column** | The working buttons: T res, P Percussions, Seq, Channel, Velocity, Duration %, Transpose, Speed, Play, Stop, Pen |
+| **Left column** | The working buttons: T res, P Percussions, Seq, Channel, Velocity, Dur, Duration %, Transpose, Speed, Play, Stop, Pen |
 | **Top of the roll** | The black histogram (how many notes of each pitch) and the little keyboard |
 | **The roll** | Your music. Notes are black bars; selected notes are red; switched-off notes are gray |
 | **Right white strip** | The time scale. Click it to put the **red marker**; numbers show bar/beat/tick |
@@ -48,6 +48,19 @@ bottom-left.
 - **Red** — the note is *selected* (picked for the next operation).
 - **Gray** — the note is *switched off* (visible for reference, but ignored
   by Play, Save and editing).
+
+### Help markers (the coloured tabs)
+
+Between the histogram and the keyboard you see little **coloured tabs**.
+They show which notes the instrument actually has; a histogram bar *without*
+a tab is a forbidden note — click that bar to select those notes (they go red).
+
+To change the tabs: **Tools → Note marks (edit tabs)**. A yellow strip appears
+at the top; while it is showing, **click the histogram** to change a tab's
+colour: none → black → red → green → blue → none. Press **Esc** (or untick the
+menu item) when you are done — RollNote then asks whether to save. The tabs are
+kept in `rollnot.txt` in your home directory (the same file the original
+program uses) and are loaded automatically when RollNote starts.
 
 ---
 
@@ -120,13 +133,14 @@ menu **Edit → Cut**. Removed notes are set aside; **Ctrl+Z** brings them back.
 ## The left column buttons
 
 Apply to all **selected** (red) notes. Set the number with the little arrows,
-then press the button button.
+then press the button.
 
 | Button | What it does |
 |--------|--------------|
 | **Seq** (number) | Moves selected notes to another sequence/track |
 | **Channel** (number) | Moves selected notes to another voice/channel (0–15) |
 | **Velocity** (number) | Sets how loud they are (0–127) |
+| **Dur** (ticks) | Length of notes you insert with the Pen |
 | **Duration %** + **Scale** | Makes notes longer or shorter (100 % = same) |
 | **Transpose** (number) + **Apply** | Shifts them up/down in pitch (12 = one octave) |
 | **P Percussions** | Shows the drum-name list (channel 9) |

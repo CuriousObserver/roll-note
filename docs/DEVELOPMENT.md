@@ -26,6 +26,9 @@ src/rollnote/
 │   ├── Note.java        note record (pitch, vel, start, dur, channel, track, selected, enabled)
 │   ├── CtrlEvent.java   non-note channel event (program, controller, aftertouch, bend)
 │   ├── MetaEvent.java   meta/sysex event with display helpers
+│   ├── NoteMarks.java   help-marker tabs: per-note colours in the original
+│   │                    rollnot.txt format ("note colour line"); the line
+│   │                    states are preserved verbatim (not edited yet)
 │   ├── Smf.java         own SMF format 0/1 read+write; note on/off pairing; format
 │   │                    conversions (0/1 x keep/zero channel, track=channel)
 │   └── NoteName.java    pitch numbering helpers (C0=12)
@@ -55,6 +58,11 @@ Key behaviors worth keeping an eye on when extending:
 
 - **States**: enabled (black) / selected (red) / disabled (gray) per note.
   The top channel matrix cycles on→selected→off.
+- **Note marks**: coloured tabs above the keyboard, edited in a mode toggled
+  by Tools → Note marks (histogram clicks cycle none/black/red/green/blue
+  while the yellow banner is up). Loaded at startup from `rollnot.txt` in the
+  working or home directory and written back in the original CRLF format;
+  the user is prompted before saving when leaving the mode.
 - **Disabled notes are filtered out of Save + Play** (documented behavior).
 - **Undo** is a snapshot stack (80 entries); selections are not undoable.
 - Clipboard keeps the original ±2900-note warning semantics.

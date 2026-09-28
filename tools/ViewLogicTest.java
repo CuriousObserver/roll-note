@@ -22,12 +22,14 @@ public class ViewLogicTest {
         Song s = new Song();
         s.division = 240;
         AtomicInteger changes = new AtomicInteger();
+        AtomicInteger marked = new AtomicInteger(-1);
         RollView v = new RollView(s, new RollView.Listener() {
             @Override public void pushUndo() {}
             @Override public void changed() { changes.incrementAndGet(); }
             @Override public void hover(String st) {}
             @Override public void pointerHover(int note, long tick) {}
             @Override public void markerChanged(long tick) {}
+            @Override public void noteMarkClicked(int note) { marked.set(note); }
         });
         v.setInsertDefaults(0, 0, 100, 120);
         v.setQuantRes(30);
@@ -81,6 +83,13 @@ public class ViewLogicTest {
         drag(v, px(v, 75), py(v, 2700));
         release(v, px(v, 75), py(v, 2700));
         check("rect selects note", n.selected);
+
+        // 5) note-marks editing mode: a histogram click reports the note
+        v.setMarksMode(true);
+        press(v, px(v, 60), 30);
+        release(v, px(v, 60), 30);
+        check("marks mode histogram click reports note", marked.get() == 60);
+        v.setMarksMode(false);
 
         f.dispose();
     }

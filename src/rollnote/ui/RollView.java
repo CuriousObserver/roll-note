@@ -1,6 +1,7 @@
 package rollnote.ui;
 
 import rollnote.core.Note;
+import rollnote.core.NoteMarks;
 import rollnote.core.Song;
 
 import javax.swing.JPanel;
@@ -65,10 +66,13 @@ public class RollView extends JPanel implements Scrollable {
         void hover(String s);
         void pointerHover(int note, long tick);  // note = -1 when over no note
         void markerChanged(long tick);
+        void noteMarkClicked(int note);          // in note-marks editing mode
     }
 
     private Song song;
     private final Listener listener;
+    private NoteMarks marks = new NoteMarks();
+    private boolean marksMode = false;
 
     // view state
     private int quantRes = 30;          // ticks; time operations snap to this
@@ -140,6 +144,12 @@ public class RollView extends JPanel implements Scrollable {
     public void setSong(Song song) { this.song = song; statsDirty = true; revalidate(); repaint(); }
 
     public Song getSong() { return song; }
+
+    public void setMarks(NoteMarks m) { marks = m; repaint(); }
+
+    /** note-marks editing: histogram clicks cycle the tab colours */
+    public void setMarksMode(boolean b) { marksMode = b; repaint(); }
+    public boolean isMarksMode() { return marksMode; }
 
     public void setQuantRes(int ticks) { quantRes = Math.max(1, ticks); }
     public int getQuantRes() { return quantRes; }
@@ -328,25 +338,35 @@ public class RollView extends JPanel implements Scrollable {
             int x = xFor(n);
             gr.drawLine(x, bandH, x, baseline);
         }
-        // bars (below the label band)
+        // bars end at the top of the note-mark tab band, like the original
+        int tabH = Math.max(4, Math.min(8, cell / 2));
+        int barBase = baseline - tabH;
         int barTop = bandH;
-        int barH = baseline - barTop - 2;
+        int barH = barBase - barTop - 2;
         for (int n = 0; n < 128; n++) {
             int x = xFor(n) + 1;
             if (statDis[n] > 0) {
                 int h = Math.max(1, (int) ((long) statDis[n] * barH / max));
                 gr.setColor(new Color(0xC8C8C8));
-                gr.fillRect(x, baseline - h, cell - 1, h);
+                gr.fillRect(x, barBase - h, cell - 1, h);
             }
             if (statEn[n] > 0) {
                 int h = Math.max(1, (int) ((long) statEn[n] * barH / max));
                 gr.setColor(Color.BLACK);
-                gr.fillRect(x, baseline - h, cell - 1, h);
+                gr.fillRect(x, barBase - h, cell - 1, h);
             }
             if (statSel[n] > 0) {
                 int h = Math.max(1, (int) ((long) statSel[n] * barH / max));
                 gr.setColor(COL_SELECTED);
-                gr.fillRect(x, baseline - h, cell - 1, h);
+                gr.fillRect(x, barBase - h, cell - 1, h);
+            }
+        }
+        // note-mark tabs: colour band between the bars and the keyboard
+        for (int n = 0; n < 128; n++) {
+            Color mc = markColor(marks.color[n]);
+            if (mc != null) {
+                gr.setColor(mc);
+                gr.fillRect(xFor(n), barBase, cell, tabH);
             }
         }
         // keyboard strip at the bottom of the top region (white/black piano style);
@@ -386,6 +406,17 @@ public class RollView extends JPanel implements Scrollable {
     private int highlighted = -1;
     public void highlightNote(int note) { highlighted = note; repaint(); }
     public void clearHighlightNote() { highlighted = -1; repaint(); }
+
+    /** tab colours of the original program, sampled from its display */
+    private static Color markColor(int c) {
+        switch (c) {
+            case NoteMarks.BLACK: return new Color(0x000000);
+            case NoteMarks.RED:   return new Color(0xE00000);
+            case NoteMarks.GREEN: return new Color(0x40A000);
+            case NoteMarks.BLUE:  return new Color(0x6060E0);
+            default: return null;
+        }
+    }
 
     private void paintRuler(Graphics2D gr, Rectangle clip) {
         int rx = rollW();
@@ -516,7 +547,17 @@ public class RollView extends JPanel implements Scrollable {
     private void updatePointer(int x, int y) {
         mx = x; my = y;
         String h = "";
-        if (x >= MARGIN && x < MARGIN + 128 * cell && y >= topH()) {
+        if (marksMode && x >= MARGIN && x < rollW() && y < topH()) {
+            // editing the tabs: name the tab colour a click would produce
+            int col = noteAtX(x);
+            int next = (marks.color[col] + 1) % 5;
+            h = String.format("%s  note %d (0x%02X): %s tab \u2013 click to change",
+                    NoteName2.name(col), col, col, NoteMarks.COLOR_NAMES[next]);
+            if (lastPtrNote != col) {
+                lastPtrNote = col;
+                listener.pointerHover(col, 0);
+            }
+        } else if (x >= MARGIN && x < MARGIN + 128 * cell && y >= topH()) {
             hoverCol = noteAtX(x);
             hoverTick = Math.max(0, tickAtY(y));
             Note n = noteAt(x, y);
@@ -585,6 +626,12 @@ public class RollView extends JPanel implements Scrollable {
         lastX = x; lastY = y;
         undoPushed = false;
         listener.hover("");
+        if (marksMode) {                          // note-marks editing: histogram clicks cycle tabs
+            if (x >= MARGIN && x < rollW() && y < topH()) {
+                listener.noteMarkClicked(noteAtX(x));
+            }
+            return;
+        }
         if (x >= rollW()) {                       // time bar: set marker
             mode = MARKER;
             setMarker(quantize(tickAtY(y)));
