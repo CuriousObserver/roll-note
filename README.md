@@ -22,7 +22,10 @@ reachable via its author's historical releases.
 - Paper-roll display: white paper, green pitch lanes, time running downward,
   black enabled notes, red selected, gray disabled
 - The pitch axis (keyboard, histogram, lanes) stretches to fit the window
-  width, 4–16 px per semitone — no wasted space on wide monitors
+  width, 4–16 px per semitone, and the keys grow taller with it (24–48 px) —
+  no wasted space on wide monitors
+- The paper fills the whole window even for short or empty songs (scrollbar
+  only appears once the song is longer than the view)
 - Black-bar note histogram + keyboard at the top, channel matrix row
   ("All 0..F") above it
 - Mouse editing: click/rectangle/histogram selection, Ctrl XOR, Shift drag,

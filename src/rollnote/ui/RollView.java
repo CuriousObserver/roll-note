@@ -34,13 +34,17 @@ public class RollView extends JPanel implements Scrollable {
     private static final long serialVersionUID = 1L;
     // geometry
     public static final int MARGIN = 18;       // left margin
-    public static final int KEY_H = 26;        // keyboard strip height
     public static final int HIST_H = 130;      // histogram bar area height
     public static final int RULER_W = 96;      // minimum right white time bar
-    public static final int TOP_H = KEY_H + HIST_H;
     public static final int MIN_CELL = 4;      // px per semitone, tightest fit
     public static final int MAX_CELL = 16;     // px per semitone, widest fit
+    public static final int KEY_H_MIN = 24;    // keyboard strip height, tightest
+    public static final int KEY_H_MAX = 48;    // keyboard strip height, widest
     public int cell = 6;                       // px per semitone (re-fitted on resize)
+    public int keyH = 26;                      // keyboard strip height (grows with cell)
+
+    /** top region height: histogram band + keyboard strip */
+    public int topH() { return HIST_H + keyH; }
 
     private static final Color BG = new Color(0xFDFEFA);
     private static final Color COL_PAPER = new Color(0xFDFEFA);
@@ -105,15 +109,17 @@ public class RollView extends JPanel implements Scrollable {
         addMouseMotionListener(m);
     }
 
-    /** re-fit the lane width to the current view width (min/max capped) */
+    /** re-fit the lane width and keyboard height to the current view width */
     public void refit() {
         int w = getWidth();
         if (w <= 0) return;
         int fit = (w - MARGIN - RULER_W) / 128;
         if (fit < MIN_CELL) fit = MIN_CELL;
         if (fit > MAX_CELL) fit = MAX_CELL;
-        if (fit != cell) {
+        int kh = Math.max(KEY_H_MIN, Math.min(KEY_H_MAX, KEY_H_MIN + (fit - MIN_CELL) * 2));
+        if (fit != cell || kh != keyH) {
             cell = fit;
+            keyH = kh;
             revalidate();
             repaint();
         }
@@ -125,7 +131,11 @@ public class RollView extends JPanel implements Scrollable {
     @Override public int getScrollableUnitIncrement(Rectangle r, int o, int d) { return 40; }
     @Override public int getScrollableBlockIncrement(Rectangle r, int o, int d) { return 200; }
     @Override public boolean getScrollableTracksViewportWidth() { return true; }
-    @Override public boolean getScrollableTracksViewportHeight() { return false; }
+    @Override public boolean getScrollableTracksViewportHeight() {
+        // fill the viewport with paper while the song is shorter than the
+        // window; scroll normally once it grows past it
+        return getParent() != null && getPreferredSize().height < getParent().getHeight();
+    }
 
     public void setSong(Song song) { this.song = song; statsDirty = true; revalidate(); repaint(); }
 
@@ -181,8 +191,8 @@ public class RollView extends JPanel implements Scrollable {
     private int xFor(int note) { return MARGIN + note * cell; }
     private int noteAtX(int x) { return Math.max(0, Math.min(127, (x - MARGIN) / cell)); }
 
-    private double yForTicks(long t) { return TOP_H + t * pxPerTick; }
-    private long tickAtY(double y) { return (long) Math.floor(Math.max(0, y - TOP_H) / pxPerTick); }
+    private double yForTicks(long t) { return topH() + t * pxPerTick; }
+    private long tickAtY(double y) { return (long) Math.floor(Math.max(0, y - topH()) / pxPerTick); }
 
     private long quantize(long t) {
         return Math.max(0, ((t + quantRes / 2) / quantRes) * quantRes);
@@ -190,7 +200,7 @@ public class RollView extends JPanel implements Scrollable {
 
     @Override
     public Dimension getPreferredSize() {
-        int h = TOP_H + (int) ((song.endTime() + song.division * 2) * pxPerTick) + 30;
+        int h = topH() + (int) ((song.endTime() + song.division * 2) * pxPerTick) + 30;
         return new Dimension(contentW(), Math.max(h, 300));
     }
 
@@ -299,21 +309,27 @@ public class RollView extends JPanel implements Scrollable {
             int c = statSel[n] + statEn[n] + statDis[n];
             if (c > max) max = c;
         }
-        int baseline = TOP_H - KEY_H;
-        final int LABEL_TOP = 3;
-        // pitch labels every octave (top band)
-        gr.setFont(new Font("SansSerif", Font.PLAIN, 11));
-        gr.setColor(new Color(0x505050));
-        for (int n = 0; n < 128; n += 12) {
-            gr.drawString("C" + (n / 12 - 1), xFor(n) + 3, LABEL_TOP + 10);
-        }
+        int baseline = topH() - keyH;
+
+        // pitch labels every octave, in their own clear band at the top.
+        // The font scales with the lane width (11..18 px, bold, dark ink),
+        // and the band is filled with the paper colour so no grid line,
+        // lane line or bar crosses the text.
+        int labelSize = Math.max(11, Math.min(18, 11 + (cell - 6)));
+        Font labelFont = new Font("SansSerif", Font.BOLD, labelSize);
+        FontMetrics labelFm = gr.getFontMetrics(labelFont);
+        int bandH = labelFm.getHeight() + 2;
+
+        gr.setColor(BG);
+        gr.fillRect(0, 0, rollW(), bandH);
+
         gr.setColor(new Color(0xD0D0D0));
-        for (int n = 0; n < 128; n++) {
+        for (int n = 0; n < 128; n++) {          // lane lines start below the band
             int x = xFor(n);
-            gr.drawLine(x, 0, x, baseline);
+            gr.drawLine(x, bandH, x, baseline);
         }
         // bars (below the label band)
-        int barTop = 16;
+        int barTop = bandH;
         int barH = baseline - barTop - 2;
         for (int n = 0; n < 128; n++) {
             int x = xFor(n) + 1;
@@ -333,29 +349,37 @@ public class RollView extends JPanel implements Scrollable {
                 gr.fillRect(x, baseline - h, cell - 1, h);
             }
         }
-        // keyboard strip at the bottom of the top region (white/black piano style)
+        // keyboard strip at the bottom of the top region (white/black piano style);
+        // the black-key inset scales a little with the key height
+        int inset = Math.max(1, keyH / 12);
         for (int n = 0; n < 128; n++) {
             int m = n % 12;
             boolean black = (m == 1 || m == 3 || m == 6 || m == 8 || m == 10);
             if (black) {
                 gr.setColor(new Color(0x1A1A1A));
-                gr.fillRect(xFor(n), baseline + 2, cell, KEY_H - 2);
+                gr.fillRect(xFor(n), baseline + inset, cell, keyH - inset);
             } else {
                 gr.setColor(Color.WHITE);
-                gr.fillRect(xFor(n), baseline, cell, KEY_H);
+                gr.fillRect(xFor(n), baseline, cell, keyH);
             }
         }
         gr.setColor(new Color(0x202020));
         gr.drawLine(MARGIN, baseline, MARGIN + 128 * cell, baseline);
-        gr.drawLine(MARGIN, baseline + KEY_H, MARGIN + 128 * cell, baseline + KEY_H);
+        gr.drawLine(MARGIN, baseline + keyH, MARGIN + 128 * cell, baseline + keyH);
         // octave separators drawn through keyboard
         for (int n = 0; n < 128; n += 12) {
-            gr.drawLine(xFor(n), baseline + 1, xFor(n), baseline + KEY_H - 1);
+            gr.drawLine(xFor(n), baseline + 1, xFor(n), baseline + keyH - 1);
         }
         // highlight column from percussion picker
         if (highlighted >= 0) {
             gr.setColor(new Color(255, 0, 0, 60));
-            gr.fillRect(xFor(highlighted), 0, cell, TOP_H);
+            gr.fillRect(xFor(highlighted), 0, cell, topH());
+        }
+        // labels last, on top of everything, nothing crosses them
+        gr.setFont(labelFont);
+        gr.setColor(new Color(0x383838));
+        for (int n = 0; n < 128; n += 12) {
+            gr.drawString("C" + (n / 12 - 1), xFor(n) + 3, labelFm.getAscent() + 1);
         }
     }
 
@@ -374,16 +398,17 @@ public class RollView extends JPanel implements Scrollable {
         int barLen = song.division * 4;
         long t0 = tickAtY(Math.max(0, clip.y));
         long t1 = tickAtY(clip.y + clip.height) + 1;
-        gr.setFont(new Font("SansSerif", Font.PLAIN, 9));
+        int rulerSize = Math.max(9, Math.min(14, 9 + (cell - 6)));   // scales like the octave labels
+        gr.setFont(new Font("SansSerif", Font.PLAIN, rulerSize));
         FontMetrics fm = gr.getFontMetrics();
         double pxBar = barLen * pxPerTick;
         for (long bb = (t0 / barLen) * barLen; bb <= t1; bb += barLen) {
             double yy = yForTicks(bb);
             gr.setColor(COL_BAR);
             gr.drawLine(rx, (int) yy, contentW(), (int) yy);
-            if (pxBar >= 16) {
+            if (pxBar >= fm.getHeight() + 4) {
                 String s = Long.toString(bb / barLen);
-                gr.setColor(new Color(0x505050));
+                gr.setColor(new Color(0x383838));
                 gr.drawString(s, rx + 4, (int) yy + fm.getAscent() - 2);
             }
         }
@@ -409,7 +434,7 @@ public class RollView extends JPanel implements Scrollable {
         }
         // marker line (red)
         double my = yForTicks(marker);
-        if (my >= TOP_H && my < clip.y + clip.height && my + 1 >= clip.y) {
+        if (my >= topH() && my < clip.y + clip.height && my + 1 >= clip.y) {
             gr.setColor(COL_MARKER);
             gr.drawLine(0, (int) my, contentW(), (int) my);
             // little handle on the ruler
@@ -422,11 +447,11 @@ public class RollView extends JPanel implements Scrollable {
             gr.drawLine(MARGIN, (int) py, rollW(), (int) py);
         }
         // pointer indicator: lane highlight + outline of the note under the cursor
-        if (mode == NONE && mx >= 0 && my >= TOP_H && hoverCol >= 0
+        if (mode == NONE && mx >= 0 && my >= topH() && hoverCol >= 0
                 && mx < rollW()) {
             int lx = xFor(hoverCol);
             gr.setColor(new Color(30, 90, 220, 36));
-            gr.fillRect(lx, TOP_H, cell, Math.max(0, getHeight() - TOP_H));
+            gr.fillRect(lx, topH(), cell, Math.max(0, getHeight() - topH()));
             if (hoverNote != null) {
                 double ys = yForTicks(hoverNote.start);
                 double ye = yForTicks(hoverNote.end());
@@ -491,7 +516,7 @@ public class RollView extends JPanel implements Scrollable {
     private void updatePointer(int x, int y) {
         mx = x; my = y;
         String h = "";
-        if (x >= MARGIN && x < MARGIN + 128 * cell && y >= TOP_H) {
+        if (x >= MARGIN && x < MARGIN + 128 * cell && y >= topH()) {
             hoverCol = noteAtX(x);
             hoverTick = Math.max(0, tickAtY(y));
             Note n = noteAt(x, y);
@@ -511,7 +536,7 @@ public class RollView extends JPanel implements Scrollable {
                 listener.pointerHover(n != null ? n.note : hoverCol,
                         n != null ? n.start : hoverTick);
             }
-        } else if (x >= rollW() && y >= TOP_H) {
+        } else if (x >= rollW() && y >= topH()) {
             hoverCol = -1;
             hoverNote = null;
             hoverTick = Math.max(0, tickAtY(y));
@@ -565,7 +590,7 @@ public class RollView extends JPanel implements Scrollable {
             setMarker(quantize(tickAtY(y)));
             return;
         }
-        if (y < TOP_H) {                          // histogram: select by note column
+        if (y < topH()) {                          // histogram: select by note column
             int note = noteAtX(x);
             if (note >= 0 && note <= 127) {
                 selectPitch(note, e.isControlDown());

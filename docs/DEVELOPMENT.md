@@ -36,9 +36,13 @@ src/rollnote/
     │                    Shift-drag, move/duration, pen insert, marker, play line,
     │                    hover chip/lane highlight, histogram & keyboard)
     │                    Lane width re-fits to the view width on resize
-    │                    (MIN_CELL..MAX_CELL px/semitone); the time ruler absorbs
-    │                    any leftover width. Implements Scrollable so the view
-    │                    tracks the viewport width (no horizontal scrollbar).
+    │                    (MIN_CELL..MAX_CELL px/semitone); the keyboard strip
+    │                    height grows with it (KEY_H_MIN..KEY_H_MAX); the time
+    │                    ruler absorbs any leftover width. Implements Scrollable
+    │                    so the view tracks the viewport width (no horizontal
+    │                    scrollbar) and tracks the viewport *height* only while
+    │                    the song is shorter than the window (paper always fills
+    │                    the screen; scrolling returns for long songs).
     ├── Player.java      javax.sound.midi playback: slice from marker, enabled
     │                    channels only, earlier events forced to time 0; Gervill
     │                    synth is connected explicitly (no receiver bug!)

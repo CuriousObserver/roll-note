@@ -4,7 +4,23 @@ build/
 dist/
 *.class
 
-# copyrighted/private, not part of the repo
+# User's private working files: screenshots, videos, recordings.
+# NEVER commit these.
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+/*.png
+/*.jpg
+/*.jpeg
+/*.webp
+/*.gif
+type_size.png
 rollook_capture.mp4
-samples/G2.MID
 rollnote_resize.mp4
+rollnote_resize_2.mp4
+
+# Copyrighted material not included in the repo
+samples/G2.MID
+samples/

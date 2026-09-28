@@ -40,9 +40,9 @@ public class ViewLogicTest {
 
         // 1) pen insert
         v.setPenMode(true);
-        press(v, px(v, 60), py(2400));
-        drag(v, px(v, 60), py(2520));
-        release(v, px(v, 60), py(2520));
+        press(v, px(v, 60), py(v, 2400));
+        drag(v, px(v, 60), py(v, 2520));
+        release(v, px(v, 60), py(v, 2520));
         v.setPenMode(false);
         check("pen inserted one note", s.notes.size() == 1);
         Note n = s.notes.get(0);
@@ -52,44 +52,44 @@ public class ViewLogicTest {
         check("pen note selected", n.selected);
 
         // 2) move drag: upper half, +7 semitones, +120 ticks
-        press(v, px(v, 60), py(2400) + 1);
-        drag(v, px(v, 67), py(2520));
-        release(v, px(v, 67), py(2520));
+        press(v, px(v, 60), py(v, 2400) + 1);
+        drag(v, px(v, 67), py(v, 2520));
+        release(v, px(v, 67), py(v, 2520));
         check("moved pitch +7", n.note == 67);
         check("moved start +120 on grid", n.start == 2520);
         check("moved dur unchanged", n.dur == 120);
 
         // 3) DUR drag (lower half). Down, part-way back, fully back:
         //    every step must derive from the SNAPSHOT (base dur), never compound.
-        int durPressY = py(2600);
+        int durPressY = py(v, 2600);
         long baseDur = 120;
         press(v, px(v, 67), durPressY);
-        long pressQ = q(ty(durPressY));
-        drag(v, px(v, 67), py(2720));
-        long dt1 = q(ty(py(2720))) - pressQ;
+        long pressQ = q(ty(v, durPressY));
+        drag(v, px(v, 67), py(v, 2720));
+        long dt1 = q(ty(v, py(v, 2720))) - pressQ;
         check("dur down applied", n.dur == baseDur + dt1 && n.dur > baseDur);
         long afterFirst = n.dur;
-        drag(v, px(v, 67), py(2660));
-        long dt2 = q(ty(py(2660))) - pressQ;
+        drag(v, px(v, 67), py(v, 2660));
+        long dt2 = q(ty(v, py(v, 2660))) - pressQ;
         check("dur snapshot (no compounding)", n.dur == baseDur + dt2 && n.dur < afterFirst);
         drag(v, px(v, 67), durPressY);
         release(v, px(v, 67), durPressY);
         check("dur back to base", n.dur == baseDur);
 
         // 4) rectangle select (note now spans ticks 2520..2640)
-        press(v, px(v, 55), py(2500));
-        drag(v, px(v, 75), py(2700));
-        release(v, px(v, 75), py(2700));
+        press(v, px(v, 55), py(v, 2500));
+        drag(v, px(v, 75), py(v, 2700));
+        release(v, px(v, 75), py(v, 2700));
         check("rect selects note", n.selected);
 
         f.dispose();
     }
 
     static int px(RollView v, int note) { return RollView.MARGIN + note * v.cell + 2; }
-    static int py(long tick) { return RollView.TOP_H + (int) (tick * PPT); }
+    static int py(RollView v, long tick) { return v.topH() + (int) (tick * PPT); }
 
     static long q(long t) { return Math.max(0, ((t + 15) / 30) * 30); }
-    static long ty(int y) { return (long) Math.floor(Math.max(0, y - RollView.TOP_H) / PPT); }
+    static long ty(RollView v, int y) { return (long) Math.floor(Math.max(0, y - v.topH()) / PPT); }
 
     static void press(RollView v, int x, int y) {
         v.dispatchEvent(new MouseEvent(v, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), 0, x, y, 1, false));

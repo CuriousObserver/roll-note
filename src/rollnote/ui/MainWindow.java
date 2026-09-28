@@ -697,13 +697,13 @@ public class MainWindow extends JFrame implements RollView.Listener {
     private long viewTopVisible() {
         // approximate the top visible tick of the viewport
         JScrollPane sp = (JScrollPane) view.getParent().getParent();
-        return (long) ((sp.getVerticalScrollBar().getValue() - RollView.TOP_H)
+        return (long) ((sp.getVerticalScrollBar().getValue() - view.topH())
                 / Math.max(1e-9, view.pxPerTick()));
     }
 
     private void ensureVisible(long tick) {
         JScrollPane sp = (JScrollPane) view.getParent().getParent();
-        int y = RollView.TOP_H + (int) (tick * view.pxPerTick());
+        int y = view.topH() + (int) (tick * view.pxPerTick());
         java.awt.Rectangle r = view.getVisibleRect();
         if (y < r.y || y > r.y + r.height - 40) {
             view.scrollRectToVisible(new java.awt.Rectangle(0, y, 1, 1));
