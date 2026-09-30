@@ -37,7 +37,7 @@ bottom-left.
 | **File / Edit / Tools / Help** | The menus at the top |
 | **All  0 1 2 3 4 5 6 7 8 9 A B C D E F** | The channel squares. **Click one** to check which voices are switched on, off, or selected (see below) |
 | **Left column** | The working buttons: T res, P Percussions, Seq, Channel, Velocity, Dur, Duration %, Transpose, Speed, Play, Stop, Pen |
-| **Top of the roll** | The black histogram (how many notes of each pitch) and the little keyboard |
+| **Top of the roll** | The black histogram (how many notes of each pitch), the coloured tabs and the little keyboard — they stay put while the music scrolls |
 | **The roll** | Your music. Notes are black bars; selected notes are red; switched-off notes are gray |
 | **Right white strip** | The time scale. Click it to put the **red marker**; numbers show bar/beat/tick |
 | **Bottom line** | Small status text |
@@ -169,7 +169,9 @@ the General MIDI sound that Windows provides.
 
 For work the mouse cannot do: menu **Tools → Event lists…** shows every event
 in two lists. Double-click (or Edit… and Delete/Replace/Insert) to change a
-single event exactly.
+single event exactly. The list and the roll keep each other company: notes
+you select on the roll show up selected in the list, and selecting rows in
+the list selects the same notes on the roll.
 
 ---
 

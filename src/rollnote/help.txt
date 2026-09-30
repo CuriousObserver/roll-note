@@ -29,7 +29,9 @@ THE SCREEN, TOP TO BOTTOM
   Left column                       T res, P Percussions, Seq, Channel,
                                     Velocity, Dur, Duration %, Transpose,
                                     Speed, Play, Stop, Pen, zoom buttons
-  Top of the roll                   the histogram and the keyboard
+  Top of the roll                   the histogram, the note-mark tabs and the
+                                    keyboard - they stay put while the music
+                                    scrolls
   The roll                          your music, time running downward
   Right white strip                 the time bar (red marker)
   Bottom line                       status text
@@ -131,6 +133,10 @@ EVENT LISTS (FINE WORK)
 Menu Tools -> Event lists... shows every event in two lists. Press
 Edit... (or double-click an item) to change one event exactly, with
 Delete / Replace / Insert options.
+
+The list and the roll keep each other company: notes you select on the
+roll appear selected (red) in the list, and selecting rows in the list
+selects the same notes on the roll.
 
 
 SAVING

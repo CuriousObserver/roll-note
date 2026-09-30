@@ -35,21 +35,27 @@ src/rollnote/
 └── ui/                  Swing
     ├── MainWindow.java  frame, menus, left rail, channel matrix, storage ops,
     │                    clipboard (cut/copy/paste), undo stack, save-as dialog
-    ├── RollView.java    the painter + all mouse gestures (select, rect, Ctrl-XOR,
-    │                    Shift-drag, move/duration, pen insert, marker, play line,
-    │                    hover chip/lane highlight, histogram & keyboard)
-    │                    Lane width re-fits to the view width on resize
-    │                    (MIN_CELL..MAX_CELL px/semitone); the keyboard strip
-    │                    height grows with it (KEY_H_MIN..KEY_H_MAX); the time
-    │                    ruler absorbs any leftover width. Implements Scrollable
-    │                    so the view tracks the viewport width (no horizontal
-    │                    scrollbar) and tracks the viewport *height* only while
-    │                    the song is shorter than the window (paper always fills
-    │                    the screen; scrolling returns for long songs).
+    ├── RollView.java    the scrolling note field: all mouse gestures (select,
+    │                    rect, Ctrl-XOR, Shift-drag, move/duration, pen insert,
+    │                    marker, play line, hover chip/lane highlight) plus the
+    │                    time ruler. Lane width re-fits to the view width on
+    │                    resize (MIN_CELL..MAX_CELL px/semitone); the keyboard
+    │                    height grows with it (KEY_H_MIN..KEY_H_MAX). Implements
+    │                    Scrollable: tracks the viewport width, and tracks the
+    │                    viewport *height* only while the song is shorter than
+    │                    the window (paper always fills the screen).
+    ├── HeaderView.java  the pinned top band (octave labels, histogram, note-mark
+    │                    tabs, keyboard), set as the scroll pane's column header
+    │                    so it never scrolls; shares lane metrics with RollView
+    │                    (cell/keyH) and owns the marks-mode and histogram clicks
     ├── Player.java      javax.sound.midi playback: slice from marker, enabled
     │                    channels only, earlier events forced to time 0; Gervill
     │                    synth is connected explicitly (no receiver bug!)
-    ├── Dialogs.java     event lists + editors, save-as options, percussion/GM pickers
+    ├── Dialogs.java     event lists + editors, save-as options, percussion/GM
+    │                    pickers. The event-list window reads the song through a
+    │                    supplier and mirrors the roll selection in both
+    │                    directions (MainWindow refreshes open dialogs on every
+    │                    change)
     ├── Gm.java          General MIDI program + percussion tables
     └── NoteName2.java   pitch numbering helpers (C-1=0) — dup of core for UI use
 ```

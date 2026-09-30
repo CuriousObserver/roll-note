@@ -24,6 +24,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.border.EmptyBorder;
 import java.awt.BorderLayout;
+import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
@@ -134,126 +135,194 @@ public final class Dialogs {
         void changed();
     }
 
-    public static void showEventLists(JFrame parent, Song song, EditCallback cb) {
-        JDialog d = new JDialog(parent, "Event lists", false);
-        JTabbedPane tabs = new JTabbedPane();
-        tabs.addTab("Note & control events", makeEventListPanel(d, song, cb));
-        tabs.addTab("Meta events", makeMetaListPanel(d, song, cb));
-        d.add(tabs);
-        d.setSize(760, 480);
-        d.setLocationRelativeTo(parent);
-        d.setVisible(true);
-    }
+    /**
+     * The event-list window. Selection is mirrored with the piano roll:
+     * rows of selected notes are drawn red, and selecting rows selects the
+     * notes in the roll (and vice versa). The dialog always reads the current
+     * song through the supplier, so it survives undo/reload.
+     */
+    public static final class EventsDialog {
+        private final JFrame parent;
+        private final java.util.function.Supplier<Song> song;
+        private final EditCallback cb;
+        private final DefaultListModel<String> noteModel = new DefaultListModel<>();
+        private final DefaultListModel<String> metaModel = new DefaultListModel<>();
+        private final JList<String> noteList = new JList<>(noteModel);
+        private final JList<String> metaList = new JList<>(metaModel);
+        private final JLabel noteHead = new JLabel(" ");
+        private final JLabel metaHead = new JLabel(" ");
+        private final JDialog dialog;
+        private boolean rebuilding = false;
+        private Runnable onClosed = () -> {};
 
-    private static JPanel makeEventListPanel(JDialog owner, Song song, EditCallback cb) {
-        DefaultListModel<String> m = new DefaultListModel<>();
-        JPanel pan = new JPanel(new BorderLayout());
-        JLabel head = new JLabel(" ");
-        head.setBorder(new EmptyBorder(2, 4, 2, 4));
-        JList<String> list = new JList<>(m);
-        refreshList(song, m, head);
-        JButton edit = new JButton("Edit...");
-        JButton del = new JButton("Delete");
-        JButton close = new JButton("Close");
-        close.addActionListener(e -> owner.dispose());
-        Runnable editSelected = () -> {
-            int i = list.getSelectedIndex();
-            if (i < 0) return;
-            cb.pushUndo();
-            Object it = itemAt(song, i);
-            boolean removed = editItem(owner, song, it);
-            if (removed) removeItem(song, it);
-            cb.changed();
-            refreshList(song, m, head);
-        };
-        edit.addActionListener(e -> editSelected.run());
-        list.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) editSelected.run();
-            }
-        });
-        del.addActionListener(e -> {
-            int i = list.getSelectedIndex();
-            if (i < 0) return;
-            cb.pushUndo();
-            removeItem(song, itemAt(song, i));
-            cb.changed();
-            refreshList(song, m, head);
-        });
-        JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        south.add(edit); south.add(del); south.add(close);
-        pan.add(head, BorderLayout.NORTH);
-        pan.add(new JScrollPane(list), BorderLayout.CENTER);
-        pan.add(south, BorderLayout.SOUTH);
-        return pan;
-    }
+        private EventsDialog(JFrame parent, java.util.function.Supplier<Song> song, EditCallback cb) {
+            this.parent = parent;
+            this.song = song;
+            this.cb = cb;
+            dialog = new JDialog(parent, "Event lists", false);
 
-    private static JPanel makeMetaListPanel(JDialog owner, Song song, EditCallback cb) {
-        DefaultListModel<String> m = new DefaultListModel<>();
-        JPanel pan = new JPanel(new BorderLayout());
-        JLabel head = new JLabel(" ");
-        head.setBorder(new EmptyBorder(2, 4, 2, 4));
-        JList<String> list = new JList<>(m);
-        refreshMeta(song, m, head);
-        JButton edit = new JButton("Edit...");
-        JButton del = new JButton("Delete");
-        JButton close = new JButton("Close");
-        close.addActionListener(e -> owner.dispose());
-        Runnable editSelected = () -> {
-            int i = list.getSelectedIndex();
-            if (i < 0) return;
-            cb.pushUndo();
-            MetaEvent it = metas(song).get(i);
-            editMeta(owner, song, it);
-            cb.changed();
-            refreshMeta(song, m, head);
-        };
-        edit.addActionListener(e -> editSelected.run());
-        list.addMouseListener(new MouseAdapter() {
-            @Override public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) editSelected.run();
-            }
-        });
-        del.addActionListener(e -> {
-            int i = list.getSelectedIndex();
-            if (i < 0) return;
-            cb.pushUndo();
-            song.metas.remove(i);
-            cb.changed();
-            refreshMeta(song, m, head);
-        });
-        JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
-        south.add(edit); south.add(del); south.add(close);
-        pan.add(head, BorderLayout.NORTH);
-        pan.add(new JScrollPane(list), BorderLayout.CENTER);
-        pan.add(south, BorderLayout.SOUTH);
-        return pan;
-    }
+            noteList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+            noteList.setCellRenderer((list, value, index, isSel, hasFocus) -> {
+                Song s = song.get();
+                Object o = (index >= 0 && index < itemCount(s)) ? itemAt(s, index) : null;
+                JLabel l = new JLabel(" " + value);
+                l.setOpaque(true);
+                if (o instanceof Note && ((Note) o).selected) {
+                    l.setBackground(new Color(0xFFD8D8));
+                    l.setForeground(new Color(0xC80000));
+                } else if (isSel) {
+                    l.setBackground(list.getSelectionBackground());
+                    l.setForeground(list.getSelectionForeground());
+                } else {
+                    l.setBackground(list.getBackground());
+                    l.setForeground(list.getForeground());
+                }
+                return l;
+            });
+            noteList.addListSelectionListener(e -> {
+                if (e.getValueIsAdjusting() || rebuilding) return;
+                Song s = song.get();
+                int[] idx = noteList.getSelectedIndices();
+                boolean anyNote = false;
+                for (int i : idx) if (itemAt(s, i) instanceof Note) { anyNote = true; break; }
+                if (!anyNote) return;
+                s.clearSelection();
+                for (int i : idx) {
+                    Object o = itemAt(s, i);
+                    if (o instanceof Note) ((Note) o).selected = true;
+                }
+                cb.changed();
+            });
+            metaList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
 
-    private static void refreshList(Song s, DefaultListModel<String> m, JLabel head) {
-        m.clear();
-        List<Object> items = items(s);
-        for (Object o : items) {
-            if (o instanceof Note)
-                m.addElement(String.format("N  tr%d ch%02d %s dur %d  note %s vel %d",
-                        ((Note) o).track, ((Note) o).channel, s.barBeatTick(((Note) o).start),
-                        ((Note) o).dur, NoteName2.name(((Note) o).note), ((Note) o).velocity));
-            else if (o instanceof CtrlEvent) {
-                CtrlEvent c = (CtrlEvent) o;
-                m.addElement(String.format("C  tr%d ch%02d %s code %c d1 %d d2 %s",
-                        c.track, c.channel, s.barBeatTick(c.time), c.code(), c.d1,
-                        c.d2 < 0 ? "-" : Integer.toString(c.d2)));
+            JPanel notePan = new JPanel(new BorderLayout());
+            noteHead.setBorder(new EmptyBorder(2, 4, 2, 4));
+            notePan.add(noteHead, BorderLayout.NORTH);
+            notePan.add(new JScrollPane(noteList), BorderLayout.CENTER);
+
+            JPanel metaPan = new JPanel(new BorderLayout());
+            metaHead.setBorder(new EmptyBorder(2, 4, 2, 4));
+            metaPan.add(metaHead, BorderLayout.NORTH);
+            metaPan.add(new JScrollPane(metaList), BorderLayout.CENTER);
+            JButton metaEdit = new JButton("Edit...");
+            JButton metaDel = new JButton("Delete");
+            Runnable editMetaSelected = () -> {
+                Song s = song.get();
+                int i = metaList.getSelectedIndex();
+                if (i < 0) return;
+                cb.pushUndo();
+                MetaEvent it = s.metas.get(i);
+                editMeta(parent, s, it);
+                cb.changed();
+            };
+            metaEdit.addActionListener(e -> editMetaSelected.run());
+            metaList.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() == 2) editMetaSelected.run();
+                }
+            });
+            metaDel.addActionListener(e -> {
+                Song s = song.get();
+                int i = metaList.getSelectedIndex();
+                if (i < 0) return;
+                cb.pushUndo();
+                s.metas.remove(i);
+                cb.changed();
+            });
+            JPanel metaSouth = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            metaSouth.add(metaEdit);
+            metaSouth.add(metaDel);
+            metaPan.add(metaSouth, BorderLayout.SOUTH);
+
+            JButton edit = new JButton("Edit...");
+            JButton del = new JButton("Delete");
+            JButton close = new JButton("Close");
+            Runnable editSelected = () -> {
+                Song s = song.get();
+                int i = noteList.getSelectedIndex();
+                if (i < 0) return;
+                cb.pushUndo();
+                Object it = itemAt(s, i);
+                boolean removed = editItem(parent, s, it);
+                if (removed) removeItem(s, it);
+                cb.changed();
+            };
+            edit.addActionListener(e -> editSelected.run());
+            noteList.addMouseListener(new MouseAdapter() {
+                @Override public void mouseClicked(MouseEvent e) {
+                    if (e.getClickCount() == 2) editSelected.run();
+                }
+            });
+            del.addActionListener(e -> {
+                Song s = song.get();
+                int i = noteList.getSelectedIndex();
+                if (i < 0) return;
+                cb.pushUndo();
+                removeItem(s, itemAt(s, i));
+                cb.changed();
+            });
+            close.addActionListener(e -> dialog.dispose());
+            JPanel south = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+            south.add(edit); south.add(del); south.add(close);
+            notePan.add(south, BorderLayout.SOUTH);
+
+            JTabbedPane tabs = new JTabbedPane();
+            tabs.addTab("Note & control events", notePan);
+            tabs.addTab("Meta events", metaPan);
+
+            dialog.add(tabs);
+            dialog.setSize(760, 480);
+            dialog.setLocationRelativeTo(parent);
+            dialog.addWindowListener(new java.awt.event.WindowAdapter() {
+                @Override public void windowClosed(java.awt.event.WindowEvent e) { onClosed.run(); }
+            });
+            refresh();
+            dialog.setVisible(true);
+        }
+
+        public void setOnClosed(Runnable r) { onClosed = r; }
+
+        /** rebuild the rows from the current song and mirror the roll selection */
+        public void refresh() {
+            Song s = song.get();
+            rebuilding = true;
+            try {
+                noteModel.clear();
+                for (Object o : items(s)) {
+                    if (o instanceof Note) {
+                        Note n = (Note) o;
+                        noteModel.addElement(String.format("N  tr%d ch%02d %s dur %d  note %s vel %d%s",
+                                n.track, n.channel, s.barBeatTick(n.start), n.dur,
+                                NoteName2.name(n.note), n.velocity, n.selected ? "  [sel]" : ""));
+                    } else {
+                        CtrlEvent c = (CtrlEvent) o;
+                        noteModel.addElement(String.format("C  tr%d ch%02d %s code %c d1 %d d2 %s",
+                                c.track, c.channel, s.barBeatTick(c.time), c.code(), c.d1,
+                                c.d2 < 0 ? "-" : Integer.toString(c.d2)));
+                    }
+                }
+                noteHead.setText(noteModel.size() + " note/control events");
+                int[] sel = new int[s.countSelectedNotes()];
+                int k = 0;
+                for (int i = 0; i < itemCount(s); i++) {
+                    Object o = itemAt(s, i);
+                    if (o instanceof Note && ((Note) o).selected && k < sel.length) sel[k++] = i;
+                }
+                noteList.setSelectedIndices(sel);
+
+                metaModel.clear();
+                for (MetaEvent x : s.metas) {
+                    metaModel.addElement(String.format("M  tr%d %s  %s", x.track, s.barBeatTick(x.time), x.display()));
+                }
+                metaHead.setText(metaModel.size() + " meta events");
+            } finally {
+                rebuilding = false;
             }
         }
-        head.setText(items.size() + " note/control events");
     }
 
-    private static void refreshMeta(Song s, DefaultListModel<String> m, JLabel head) {
-        m.clear();
-        for (MetaEvent x : s.metas) {
-            m.addElement(String.format("M  tr%d %s  %s", x.track, s.barBeatTick(x.time), x.display()));
-        }
-        head.setText(s.metas.size() + " meta events");
+    public static EventsDialog showEventLists(JFrame parent, java.util.function.Supplier<Song> song, EditCallback cb) {
+        return new EventsDialog(parent, song, cb);
     }
 
     private static List<Object> items(Song s) {
@@ -268,6 +337,7 @@ public final class Dialogs {
         });
         return out;
     }
+    private static int itemCount(Song s) { return s.notes.size() + s.ctrls.size(); }
     private static Object itemAt(Song s, int i) {
         if (i < s.notes.size()) return s.notes.get(i);
         return s.ctrls.get(i - s.notes.size());
@@ -276,7 +346,6 @@ public final class Dialogs {
         if (o instanceof Note) s.notes.remove(o);
         else s.ctrls.remove(o);
     }
-    private static List<MetaEvent> metas(Song s) { return s.metas; }
 
     // ------------------------------------------------------------- editors
 

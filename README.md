@@ -35,7 +35,9 @@ reachable via its author's historical releases.
   upper-half move, lower-half duration, pen insertion
 - Bulk ops: Seq, Channel, Velocity, Duration scale, Transpose
 - Cut/copy/paste at the red marker, undo
-- Event lists with edit dialogs, GM instrument + percussion pickers
+- Event lists with edit dialogs, GM instrument + percussion pickers;
+  selections mirror the piano roll in both directions
+- Keyboard, note-mark tabs and histogram stay pinned while the roll scrolls
 - Playback through the built-in General MIDI synthesizer (no external
   soundfont needed) with 1×, 1/2×, 1/4× speed
 - Pointer readout: note name/number chip, highlighted pitch lane, big status

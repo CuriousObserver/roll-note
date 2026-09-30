@@ -1,9 +1,12 @@
 import rollnote.core.Note;
+import rollnote.core.NoteMarks;
 import rollnote.core.Song;
+import rollnote.ui.HeaderView;
 import rollnote.ui.RollView;
 
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
+import java.awt.Component;
 import java.awt.event.MouseEvent;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -23,14 +26,15 @@ public class ViewLogicTest {
         s.division = 240;
         AtomicInteger changes = new AtomicInteger();
         AtomicInteger marked = new AtomicInteger(-1);
-        RollView v = new RollView(s, new RollView.Listener() {
+        RollView.Listener listener = new RollView.Listener() {
             @Override public void pushUndo() {}
             @Override public void changed() { changes.incrementAndGet(); }
             @Override public void hover(String st) {}
             @Override public void pointerHover(int note, long tick) {}
             @Override public void markerChanged(long tick) {}
             @Override public void noteMarkClicked(int note) { marked.set(note); }
-        });
+        };
+        RollView v = new RollView(s, listener);
         v.setInsertDefaults(0, 0, 100, 120);
         v.setQuantRes(30);
         JFrame f = new JFrame();
@@ -84,30 +88,32 @@ public class ViewLogicTest {
         release(v, px(v, 75), py(v, 2700));
         check("rect selects note", n.selected);
 
-        // 5) note-marks editing mode: a histogram click reports the note
-        v.setMarksMode(true);
-        press(v, px(v, 60), 30);
-        release(v, px(v, 60), 30);
+        // 5) pinned header: a histogram click reports the note in marks mode
+        HeaderView h = new HeaderView(v, s, new NoteMarks(), listener);
+        h.setSize(885, RollView.HIST_H + v.keyH);
+        h.setMarksMode(true);
+        press(h, px(v, 60), 30);
+        release(h, px(v, 60), 30);
         check("marks mode histogram click reports note", marked.get() == 60);
-        v.setMarksMode(false);
+        h.setMarksMode(false);
 
         f.dispose();
     }
 
     static int px(RollView v, int note) { return RollView.MARGIN + note * v.cell + 2; }
-    static int py(RollView v, long tick) { return v.topH() + (int) (tick * PPT); }
+    static int py(RollView v, long tick) { return (int) (tick * PPT); }
 
     static long q(long t) { return Math.max(0, ((t + 15) / 30) * 30); }
-    static long ty(RollView v, int y) { return (long) Math.floor(Math.max(0, y - v.topH()) / PPT); }
+    static long ty(RollView v, int y) { return (long) Math.floor(Math.max(0, y) / PPT); }
 
-    static void press(RollView v, int x, int y) {
-        v.dispatchEvent(new MouseEvent(v, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), 0, x, y, 1, false));
+    static void press(Component c, int x, int y) {
+        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), 0, x, y, 1, false));
     }
-    static void drag(RollView v, int x, int y) {
-        v.dispatchEvent(new MouseEvent(v, MouseEvent.MOUSE_DRAGGED, System.currentTimeMillis(), 0, x, y, 1, false));
+    static void drag(Component c, int x, int y) {
+        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_DRAGGED, System.currentTimeMillis(), 0, x, y, 1, false));
     }
-    static void release(RollView v, int x, int y) {
-        v.dispatchEvent(new MouseEvent(v, MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(), 0, x, y, 1, false));
+    static void release(Component c, int x, int y) {
+        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(), 0, x, y, 1, false));
     }
 
     static void check(String name, boolean ok) {

@@ -1,7 +1,6 @@
 package rollnote.ui;
 
 import rollnote.core.Note;
-import rollnote.core.NoteMarks;
 import rollnote.core.Song;
 
 import javax.swing.JPanel;
@@ -45,18 +44,17 @@ public class RollView extends JPanel implements Scrollable {
     public int keyH = 26;                      // keyboard strip height (grows with cell)
 
     /** top region height: histogram band + keyboard strip */
-    public int topH() { return HIST_H + keyH; }
 
-    private static final Color BG = new Color(0xFDFEFA);
+    static final Color BG = new Color(0xFDFEFA);
     private static final Color COL_PAPER = new Color(0xFDFEFA);
     private static final Color COL_BLACKKEY = new Color(0xF1F7EE);
-    private static final Color COL_GRID = new Color(0x9FDF9A);
+    static final Color COL_GRID = new Color(0x9FDF9A);
     private static final Color COL_BEAT = new Color(0xD9EFD4);
     private static final Color COL_BAR = new Color(0x7CD77C);
     private static final Color COL_OCTAVE = new Color(0x3FB43F);
     private static final Color COL_DISABLED = new Color(0xB8BCB8);
     private static final Color COL_ENABLED = Color.BLACK;
-    private static final Color COL_SELECTED = new Color(0xE00000);
+    static final Color COL_SELECTED = new Color(0xE00000);
     private static final Color COL_MARKER = new Color(0xE00000);
     private static final Color COL_PLAY = new Color(0x009A00);
 
@@ -71,7 +69,6 @@ public class RollView extends JPanel implements Scrollable {
 
     private Song song;
     private final Listener listener;
-    private NoteMarks marks = new NoteMarks();
     private boolean marksMode = false;
 
     // view state
@@ -90,9 +87,6 @@ public class RollView extends JPanel implements Scrollable {
     private int pressNote;
     private Rectangle2D rect;
     private ArrayList<long[]> base;         // snapshots of dragged notes: note,start,dur
-
-    private int[] statSel = new int[128], statEn = new int[128], statDis = new int[128];
-    private boolean statsDirty = true;
 
     public RollView(Song song, Listener listener) {
         this.song = song;
@@ -126,8 +120,12 @@ public class RollView extends JPanel implements Scrollable {
             keyH = kh;
             revalidate();
             repaint();
+            if (onRefit != null) onRefit.run();   // keep the pinned header in step
         }
     }
+
+    private Runnable onRefit;
+    public void setOnRefit(Runnable r) { onRefit = r; }
 
     // ---------------------------------------------------------------- Scrollable
 
@@ -141,11 +139,9 @@ public class RollView extends JPanel implements Scrollable {
         return getParent() != null && getPreferredSize().height < getParent().getHeight();
     }
 
-    public void setSong(Song song) { this.song = song; statsDirty = true; revalidate(); repaint(); }
+    public void setSong(Song song) { this.song = song; revalidate(); repaint(); }
 
     public Song getSong() { return song; }
-
-    public void setMarks(NoteMarks m) { marks = m; repaint(); }
 
     /** note-marks editing: histogram clicks cycle the tab colours */
     public void setMarksMode(boolean b) { marksMode = b; repaint(); }
@@ -201,8 +197,8 @@ public class RollView extends JPanel implements Scrollable {
     private int xFor(int note) { return MARGIN + note * cell; }
     private int noteAtX(int x) { return Math.max(0, Math.min(127, (x - MARGIN) / cell)); }
 
-    private double yForTicks(long t) { return topH() + t * pxPerTick; }
-    private long tickAtY(double y) { return (long) Math.floor(Math.max(0, y - topH()) / pxPerTick); }
+    private double yForTicks(long t) { return t * pxPerTick; }
+    private long tickAtY(double y) { return (long) Math.floor(Math.max(0, y) / pxPerTick); }
 
     private long quantize(long t) {
         return Math.max(0, ((t + quantRes / 2) / quantRes) * quantRes);
@@ -210,32 +206,17 @@ public class RollView extends JPanel implements Scrollable {
 
     @Override
     public Dimension getPreferredSize() {
-        int h = topH() + (int) ((song.endTime() + song.division * 2) * pxPerTick) + 30;
+        int h = (int) ((song.endTime() + song.division * 2) * pxPerTick) + 30;
         return new Dimension(contentW(), Math.max(h, 300));
     }
 
     // ---- stats ---------------------------------------------------------
-
-    private void ensureStats() {
-        if (!statsDirty) return;
-        statSel = new int[128];
-        statEn = new int[128];
-        statDis = new int[128];
-        for (Note n : song.notes) {
-            if (n.selected) statSel[n.note]++;
-            else if (n.enabled) statEn[n.note]++;
-            else statDis[n.note]++;
-        }
-        statsDirty = false;
-    }
-    public void refreshStats() { statsDirty = true; repaint(); }
 
     // ---- paint ---------------------------------------------------------
 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
-        ensureStats();
         Graphics2D gr = (Graphics2D) g;
         Rectangle clip = gr.getClipBounds();
         gr.setColor(BG);
@@ -246,7 +227,6 @@ public class RollView extends JPanel implements Scrollable {
 
         paintPitchField(gr, t0, t1, clip);
         paintNotes(gr, clip, t0, t1);
-        paintHistogram(gr);
         paintRuler(gr, clip);
         paintCursorMarks(gr, clip);
         paintHoverInfo(gr);
@@ -313,111 +293,6 @@ public class RollView extends JPanel implements Scrollable {
         }
     }
 
-    private void paintHistogram(Graphics2D gr) {
-        int max = 1;
-        for (int n = 0; n < 128; n++) {
-            int c = statSel[n] + statEn[n] + statDis[n];
-            if (c > max) max = c;
-        }
-        int baseline = topH() - keyH;
-
-        // pitch labels every octave, in their own clear band at the top.
-        // The font scales with the lane width (11..18 px, bold, dark ink),
-        // and the band is filled with the paper colour so no grid line,
-        // lane line or bar crosses the text.
-        int labelSize = Math.max(11, Math.min(18, 11 + (cell - 6)));
-        Font labelFont = new Font("SansSerif", Font.BOLD, labelSize);
-        FontMetrics labelFm = gr.getFontMetrics(labelFont);
-        int bandH = labelFm.getHeight() + 2;
-
-        gr.setColor(BG);
-        gr.fillRect(0, 0, rollW(), bandH);
-
-        gr.setColor(new Color(0xD0D0D0));
-        for (int n = 0; n < 128; n++) {          // lane lines start below the band
-            int x = xFor(n);
-            gr.drawLine(x, bandH, x, baseline);
-        }
-        // bars end at the top of the note-mark tab band, like the original
-        int tabH = Math.max(4, Math.min(8, cell / 2));
-        int barBase = baseline - tabH;
-        int barTop = bandH;
-        int barH = barBase - barTop - 2;
-        for (int n = 0; n < 128; n++) {
-            int x = xFor(n) + 1;
-            if (statDis[n] > 0) {
-                int h = Math.max(1, (int) ((long) statDis[n] * barH / max));
-                gr.setColor(new Color(0xC8C8C8));
-                gr.fillRect(x, barBase - h, cell - 1, h);
-            }
-            if (statEn[n] > 0) {
-                int h = Math.max(1, (int) ((long) statEn[n] * barH / max));
-                gr.setColor(Color.BLACK);
-                gr.fillRect(x, barBase - h, cell - 1, h);
-            }
-            if (statSel[n] > 0) {
-                int h = Math.max(1, (int) ((long) statSel[n] * barH / max));
-                gr.setColor(COL_SELECTED);
-                gr.fillRect(x, barBase - h, cell - 1, h);
-            }
-        }
-        // note-mark tabs: colour band between the bars and the keyboard
-        for (int n = 0; n < 128; n++) {
-            Color mc = markColor(marks.color[n]);
-            if (mc != null) {
-                gr.setColor(mc);
-                gr.fillRect(xFor(n), barBase, cell, tabH);
-            }
-        }
-        // keyboard strip at the bottom of the top region (white/black piano style);
-        // the black-key inset scales a little with the key height
-        int inset = Math.max(1, keyH / 12);
-        for (int n = 0; n < 128; n++) {
-            int m = n % 12;
-            boolean black = (m == 1 || m == 3 || m == 6 || m == 8 || m == 10);
-            if (black) {
-                gr.setColor(new Color(0x1A1A1A));
-                gr.fillRect(xFor(n), baseline + inset, cell, keyH - inset);
-            } else {
-                gr.setColor(Color.WHITE);
-                gr.fillRect(xFor(n), baseline, cell, keyH);
-            }
-        }
-        gr.setColor(new Color(0x202020));
-        gr.drawLine(MARGIN, baseline, MARGIN + 128 * cell, baseline);
-        gr.drawLine(MARGIN, baseline + keyH, MARGIN + 128 * cell, baseline + keyH);
-        // octave separators drawn through keyboard
-        for (int n = 0; n < 128; n += 12) {
-            gr.drawLine(xFor(n), baseline + 1, xFor(n), baseline + keyH - 1);
-        }
-        // highlight column from percussion picker
-        if (highlighted >= 0) {
-            gr.setColor(new Color(255, 0, 0, 60));
-            gr.fillRect(xFor(highlighted), 0, cell, topH());
-        }
-        // labels last, on top of everything, nothing crosses them
-        gr.setFont(labelFont);
-        gr.setColor(new Color(0x383838));
-        for (int n = 0; n < 128; n += 12) {
-            gr.drawString("C" + (n / 12 - 1), xFor(n) + 3, labelFm.getAscent() + 1);
-        }
-    }
-
-    private int highlighted = -1;
-    public void highlightNote(int note) { highlighted = note; repaint(); }
-    public void clearHighlightNote() { highlighted = -1; repaint(); }
-
-    /** tab colours of the original program, sampled from its display */
-    private static Color markColor(int c) {
-        switch (c) {
-            case NoteMarks.BLACK: return new Color(0x000000);
-            case NoteMarks.RED:   return new Color(0xE00000);
-            case NoteMarks.GREEN: return new Color(0x40A000);
-            case NoteMarks.BLUE:  return new Color(0x6060E0);
-            default: return null;
-        }
-    }
-
     private void paintRuler(Graphics2D gr, Rectangle clip) {
         int rx = rollW();
         int rw = rulerW();
@@ -465,7 +340,7 @@ public class RollView extends JPanel implements Scrollable {
         }
         // marker line (red)
         double my = yForTicks(marker);
-        if (my >= topH() && my < clip.y + clip.height && my + 1 >= clip.y) {
+        if (my >= 0 && my < clip.y + clip.height && my + 1 >= clip.y) {
             gr.setColor(COL_MARKER);
             gr.drawLine(0, (int) my, contentW(), (int) my);
             // little handle on the ruler
@@ -478,11 +353,11 @@ public class RollView extends JPanel implements Scrollable {
             gr.drawLine(MARGIN, (int) py, rollW(), (int) py);
         }
         // pointer indicator: lane highlight + outline of the note under the cursor
-        if (mode == NONE && mx >= 0 && my >= topH() && hoverCol >= 0
+        if (mode == NONE && mx >= 0 && my >= 0 && hoverCol >= 0
                 && mx < rollW()) {
             int lx = xFor(hoverCol);
             gr.setColor(new Color(30, 90, 220, 36));
-            gr.fillRect(lx, topH(), cell, Math.max(0, getHeight() - topH()));
+            gr.fillRect(lx, 0, cell, Math.max(0, getHeight()));
             if (hoverNote != null) {
                 double ys = yForTicks(hoverNote.start);
                 double ye = yForTicks(hoverNote.end());
@@ -547,17 +422,7 @@ public class RollView extends JPanel implements Scrollable {
     private void updatePointer(int x, int y) {
         mx = x; my = y;
         String h = "";
-        if (marksMode && x >= MARGIN && x < rollW() && y < topH()) {
-            // editing the tabs: name the tab colour a click would produce
-            int col = noteAtX(x);
-            int next = (marks.color[col] + 1) % 5;
-            h = String.format("%s  note %d (0x%02X): %s tab \u2013 click to change",
-                    NoteName2.name(col), col, col, NoteMarks.COLOR_NAMES[next]);
-            if (lastPtrNote != col) {
-                lastPtrNote = col;
-                listener.pointerHover(col, 0);
-            }
-        } else if (x >= MARGIN && x < MARGIN + 128 * cell && y >= topH()) {
+        if (x >= MARGIN && x < MARGIN + 128 * cell && y >= 0) {
             hoverCol = noteAtX(x);
             hoverTick = Math.max(0, tickAtY(y));
             Note n = noteAt(x, y);
@@ -577,7 +442,7 @@ public class RollView extends JPanel implements Scrollable {
                 listener.pointerHover(n != null ? n.note : hoverCol,
                         n != null ? n.start : hoverTick);
             }
-        } else if (x >= rollW() && y >= topH()) {
+        } else if (x >= rollW() && y >= 0) {
             hoverCol = -1;
             hoverNote = null;
             hoverTick = Math.max(0, tickAtY(y));
@@ -626,23 +491,10 @@ public class RollView extends JPanel implements Scrollable {
         lastX = x; lastY = y;
         undoPushed = false;
         listener.hover("");
-        if (marksMode) {                          // note-marks editing: histogram clicks cycle tabs
-            if (x >= MARGIN && x < rollW() && y < topH()) {
-                listener.noteMarkClicked(noteAtX(x));
-            }
-            return;
-        }
+        if (marksMode) return;                    // note-marks editing: input goes to the header
         if (x >= rollW()) {                       // time bar: set marker
             mode = MARKER;
             setMarker(quantize(tickAtY(y)));
-            return;
-        }
-        if (y < topH()) {                          // histogram: select by note column
-            int note = noteAtX(x);
-            if (note >= 0 && note <= 127) {
-                selectPitch(note, e.isControlDown());
-                listener.changed();
-            }
             return;
         }
         if (penMode) {                            // insertion mode
@@ -693,13 +545,6 @@ public class RollView extends JPanel implements Scrollable {
         pressNote = noteAtX(x);
         snapshotSelection();
         listener.changed();
-    }
-
-    private void selectPitch(int note, boolean ctrl) {
-        if (!ctrl) song.clearSelection();
-        for (Note n : song.notes)
-            if (n.note == note && n.enabled)
-                n.selected = ctrl ? !n.selected : true;
     }
 
     private void snapshotSelection() {

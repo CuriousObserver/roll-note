@@ -54,7 +54,10 @@ public class MainWindow extends JFrame implements RollView.Listener {
     private Path currentFile;
     private boolean dirty = false;
 
+    // note marks (coloured tabs above the keyboard), original rollnot.txt format
+    private final NoteMarks marks = new NoteMarks();
     private final RollView view = new RollView(song, this);
+    private final HeaderView header = new HeaderView(view, song, marks, this);
     private final Player player = new Player(new Player.Listener() {
         @Override public void playTick(long t) {
             view.setPlayTick(t);
@@ -97,8 +100,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
     private final JRadioButton speedHalf = new JRadioButton("1/2x");
     private final JRadioButton speedQuarter = new JRadioButton("1/4x");
 
-    // note marks (coloured tabs above the keyboard), original rollnot.txt format
-    private final NoteMarks marks = new NoteMarks();
+    private final List<Dialogs.EventsDialog> eventDialogs = new ArrayList<>();
     private Path marksPath;
     private boolean marksDirty;
     private boolean marksGuard;
@@ -129,11 +131,12 @@ public class MainWindow extends JFrame implements RollView.Listener {
         JScrollPane sp = new JScrollPane(view);
         sp.getVerticalScrollBar().setUnitIncrement(40);
         sp.setPreferredSize(new Dimension(view.getPreferredSize().width, 480));
+        sp.setColumnHeaderView(header);           // keyboard/histogram/tabs stay pinned
+        view.setOnRefit(() -> { header.revalidate(); header.repaint(); });
         root.add(sp, BorderLayout.CENTER);
         root.add(buildStatus(), BorderLayout.SOUTH);
         add(root);
 
-        view.setMarks(marks);
         loadMarksAtStartup();
 
         setJMenuBar(buildMenus());
@@ -201,7 +204,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
         JButton pButton = new JButton("P  Percussions");
         pButton.setToolTipText("Percussion names (channel 9)");
         pButton.addActionListener(e -> Dialogs.showPercussionPicker(MainWindow.this,
-                note -> view.highlightNote(note)));
+                note -> header.highlightNote(note)));
         JPanel pRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
         pRow.add(pButton);
         col.add(pRow);
@@ -333,13 +336,17 @@ public class MainWindow extends JFrame implements RollView.Listener {
         bar.add(edit);
 
         JMenu tools = new JMenu("Tools");
-        tools.add(mi("Event lists...", 0, 0, e -> Dialogs.showEventLists(this, song,
-                new Dialogs.EditCallback() {
-                    @Override public void pushUndo() { snapshotUndo(); }
-                    @Override public void changed() { changed(); }
-                })));
+        tools.add(mi("Event lists...", 0, 0, e -> {
+            Dialogs.EventsDialog d = Dialogs.showEventLists(this, () -> song,
+                    new Dialogs.EditCallback() {
+                        @Override public void pushUndo() { MainWindow.this.snapshotUndo(); }
+                        @Override public void changed() { MainWindow.this.changed(); }
+                    });
+            d.setOnClosed(() -> eventDialogs.remove(d));
+            eventDialogs.add(d);
+        }));
         tools.add(mi("Percussion names...", 0, 0, e -> Dialogs.showPercussionPicker(this,
-                note -> view.highlightNote(note))));
+                note -> header.highlightNote(note))));
         tools.addSeparator();
         marksItem = new JCheckBoxMenuItem("Note marks (edit tabs)");
         marksItem.addItemListener(e -> marksToggled());
@@ -637,19 +644,20 @@ public class MainWindow extends JFrame implements RollView.Listener {
     /** switch to the current song object without touching undo/redo history */
     private void applySong() {
         view.setSong(song);
+        header.setSong(song);
         view.setPxPerQuarter(34.0);
         view.setQuantRes(Math.max(1, song.division / 8));
         view.setMarker(0);
         pen.setSelected(false);
         view.setPenMode(false);
-        view.clearHighlightNote();
+        header.clearHighlightNote();
         player.stop();
         updateMatrixCount();
     }
 
     /** refresh model-derived UI without marking the file dirty */
     private void refreshAll() {
-        view.refreshStats();
+        header.refreshStats();
         matrix.repaint();
         updateStatus();
     }
@@ -728,10 +736,11 @@ public class MainWindow extends JFrame implements RollView.Listener {
 
     @Override public void changed() {
         dirty = true;
-        view.refreshStats();
+        header.refreshStats();
         view.revalidate();     // let the roll grow when edits extend the song
         matrix.repaint();
         updateStatus();
+        for (Dialogs.EventsDialog d : new ArrayList<>(eventDialogs)) d.refresh();
         debug("changed: notes=" + song.notes.size() + " sel=" + song.countSelectedNotes());
     }
 
@@ -760,7 +769,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
         if (p == null) return;
         if (marks.load(p)) {
             marksPath = p;
-            view.repaint();
+            header.repaint();
             statusMessage("note marks loaded from " + p);
         } else {
             statusMessage("could not read note marks from " + p);
@@ -779,6 +788,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
             System.arraycopy(marks.color, 0, marksColorBackup, 0, 128);
             System.arraycopy(marks.line, 0, marksLineBackup, 0, 128);
             view.setMarksMode(true);
+            header.setMarksMode(true);
             marksBanner.setVisible(true);
             revalidate();
             statusMessage("note marks: click the histogram to change a tab colour");
@@ -823,6 +833,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
             }
         }
         view.setMarksMode(false);
+        header.setMarksMode(false);
         marksBanner.setVisible(false);
         revalidate();
         statusMessage("note marks editing finished");
@@ -832,7 +843,7 @@ public class MainWindow extends JFrame implements RollView.Listener {
     @Override public void noteMarkClicked(int note) {
         marks.cycleColor(note);
         marksDirty = true;
-        view.repaint();
+        header.repaint();
         statusMessage("note " + note + " (" + NoteName2.name(note) + "): "
                 + NoteMarks.COLOR_NAMES[marks.color[note]] + " tab");
     }
@@ -853,13 +864,13 @@ public class MainWindow extends JFrame implements RollView.Listener {
     private long viewTopVisible() {
         // approximate the top visible tick of the viewport
         JScrollPane sp = (JScrollPane) view.getParent().getParent();
-        return (long) ((sp.getVerticalScrollBar().getValue() - view.topH())
+        return (long) (sp.getVerticalScrollBar().getValue()
                 / Math.max(1e-9, view.pxPerTick()));
     }
 
     private void ensureVisible(long tick) {
         JScrollPane sp = (JScrollPane) view.getParent().getParent();
-        int y = view.topH() + (int) (tick * view.pxPerTick());
+        int y = (int) (tick * view.pxPerTick());
         java.awt.Rectangle r = view.getVisibleRect();
         if (y < r.y || y > r.y + r.height - 40) {
             view.scrollRectToVisible(new java.awt.Rectangle(0, y, 1, 1));
