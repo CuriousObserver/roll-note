@@ -7,6 +7,7 @@ import rollnote.ui.RollView;
 import javax.swing.JFrame;
 import javax.swing.SwingUtilities;
 import java.awt.Component;
+import java.awt.event.InputEvent;
 import java.awt.event.MouseEvent;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -90,7 +91,41 @@ public class ViewLogicTest {
         release(v, px(v, 75), py(v, 2700));
         check("rect selects note", n.selected);
 
-        // 5) pinned header: a histogram click reports the note in marks mode
+        // 5) time-bar interval selection (the white ruler on the right)
+        Note n2 = new Note(62, 100, 3000, 120, 0, 0);
+        s.notes.add(n2);
+        int rulerX = RollView.MARGIN + 128 * v.cell + 10;
+        press(v, rulerX, py(v, 2350));
+        drag(v, rulerX, py(v, 2650));
+        release(v, rulerX, py(v, 2650));
+        check("ruler drag selects notes in the interval", n.selected && !n2.selected);
+        check("ruler drag sets the marker", v.getMarker() == q(ty(v, py(v, 2650))));
+
+        // ctrl-drag accumulates by XOR
+        press(v, rulerX, py(v, 2950), InputEvent.CTRL_DOWN_MASK);
+        drag(v, rulerX, py(v, 3150));
+        release(v, rulerX, py(v, 3150), InputEvent.CTRL_DOWN_MASK);
+        check("ctrl ruler drag adds notes", n.selected && n2.selected);
+
+        press(v, rulerX, py(v, 2500), InputEvent.CTRL_DOWN_MASK);
+        drag(v, rulerX, py(v, 2700));
+        release(v, rulerX, py(v, 2700), InputEvent.CTRL_DOWN_MASK);
+        check("ctrl ruler drag un-selects overlapped notes", !n.selected && n2.selected);
+
+        // a plain click only sets the marker; the selection stays untouched
+        boolean n2selBefore = n2.selected;
+        press(v, rulerX, py(v, 4000));
+        release(v, rulerX, py(v, 4000));
+        check("ruler click keeps the selection", n2.selected == n2selBefore);
+        check("ruler click sets the marker", v.getMarker() == q(ty(v, py(v, 4000))));
+
+        // shift-drag inside the ruler moves the selection
+        press(v, rulerX, py(v, 3420), InputEvent.SHIFT_DOWN_MASK);
+        drag(v, rulerX, py(v, 3120));
+        release(v, rulerX, py(v, 3120), InputEvent.SHIFT_DOWN_MASK);
+        check("shift-drag in the ruler moves the selection", n2.start == 2700);
+
+        // 6) pinned header: a histogram click reports the note in marks mode
         HeaderView h = new HeaderView(v, s, new NoteMarks(), listener);
         h.setSize(885, RollView.HIST_H + v.keyH);
         h.setMarksMode(true);
@@ -108,14 +143,18 @@ public class ViewLogicTest {
     static long q(long t) { return Math.max(0, ((t + 15) / 30) * 30); }
     static long ty(RollView v, int y) { return (long) Math.floor(Math.max(0, y) / PPT); }
 
-    static void press(Component c, int x, int y) {
-        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), 0, x, y, 1, false));
+    static void press(Component c, int x, int y) { press(c, x, y, 0); }
+    static void drag(Component c, int x, int y) { drag(c, x, y, 0); }
+    static void release(Component c, int x, int y) { release(c, x, y, 0); }
+
+    static void press(Component c, int x, int y, int mods) {
+        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_PRESSED, System.currentTimeMillis(), mods, x, y, 1, false));
     }
-    static void drag(Component c, int x, int y) {
-        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_DRAGGED, System.currentTimeMillis(), 0, x, y, 1, false));
+    static void drag(Component c, int x, int y, int mods) {
+        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_DRAGGED, System.currentTimeMillis(), mods, x, y, 1, false));
     }
-    static void release(Component c, int x, int y) {
-        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(), 0, x, y, 1, false));
+    static void release(Component c, int x, int y, int mods) {
+        c.dispatchEvent(new MouseEvent(c, MouseEvent.MOUSE_RELEASED, System.currentTimeMillis(), mods, x, y, 1, false));
     }
 
     static void check(String name, boolean ok) {

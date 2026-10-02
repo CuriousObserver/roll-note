@@ -338,6 +338,13 @@ public class RollView extends JPanel implements Scrollable {
             gr.setColor(new Color(0x2020A0));
             gr.drawRect(a, b, w, h);
         }
+        // time-bar interval band while dragging
+        if (mode == MARKER && marker != pressTick) {
+            double ya = yForTicks(Math.min(pressTick, marker));
+            double yb = yForTicks(Math.max(pressTick, marker));
+            gr.setColor(new Color(32, 32, 160, 45));
+            gr.fillRect(MARGIN, (int) ya, rollW() - MARGIN, Math.max(2, (int) (yb - ya)));
+        }
         // marker line (red)
         double my = yForTicks(marker);
         if (my >= 0 && my < clip.y + clip.height && my + 1 >= clip.y) {
@@ -492,9 +499,18 @@ public class RollView extends JPanel implements Scrollable {
         undoPushed = false;
         listener.hover("");
         if (marksMode) return;                    // note-marks editing: input goes to the header
-        if (x >= rollW()) {                       // time bar: set marker
+        if (x >= rollW()) {                       // time bar: marker + interval selection
+            if (e.isShiftDown() && song.countSelectedNotes() > 0) {
+                // shift-drag works anywhere, including the time bar
+                mode = MOVE_ALL;
+                pressTick = quantize(tickAtY(y));
+                pressNote = noteAtX(x);
+                snapshotSelection();
+                return;
+            }
             mode = MARKER;
-            setMarker(quantize(tickAtY(y)));
+            pressTick = quantize(tickAtY(y));
+            setMarker(pressTick);
             return;
         }
         if (penMode) {                            // insertion mode
@@ -668,6 +684,22 @@ public class RollView extends JPanel implements Scrollable {
     private void doRelease(MouseEvent e) {
         int x = e.getX(), y = e.getY();
         switch (mode) {
+            case MARKER: {
+                // a real drag in the time bar selects the notes in that interval
+                long t0 = Math.min(pressTick, marker);
+                long t1 = Math.max(pressTick, marker);
+                if (t1 > t0) {
+                    boolean ctrl = e.isControlDown();
+                    if (!ctrl) song.clearSelection();
+                    for (Note n : song.notes) {
+                        if (!n.enabled) continue;
+                        if (n.start <= t1 && n.end() >= t0)
+                            n.selected = ctrl ? !n.selected : true;
+                    }
+                    listener.changed();
+                }
+                break;
+            }
             case RECT:
                 if (rect != null) {
                     int x0n = noteAtX((int) rect.getMinX());
