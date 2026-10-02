@@ -102,6 +102,8 @@ public final class Smf {
                         trackEnd = time;
                     }
                 }
+                if (r.pos > endPos)
+                    throw new FormatException("event overruns track " + t + " at " + r.pos);
             }
             for (Map.Entry<Long, ArrayDeque<long[]>> e : pending.entrySet()) {
                 int chan = (int) (e.getKey() >> 7), note = (int) (e.getKey() & 0x7F);

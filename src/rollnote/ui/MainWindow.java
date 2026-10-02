@@ -472,10 +472,12 @@ public class MainWindow extends JFrame implements RollView.Listener {
         }
 
         private void cycle(int i) {
-            snapshotUndo();
             boolean anySel = false, anyEn = false;
             for (Note n : song.notes)
                 if (member(n, i)) { if (n.selected) anySel = true; if (n.enabled) anyEn = true; }
+            // selection-only transitions (enabled -> selected) are not undoable,
+            // like note clicks; disabling/enabling changes the note state
+            if (anySel || !anyEn) snapshotUndo();
             if (anySel) {                       // selected -> disabled
                 for (Note n : song.notes)
                     if (member(n, i)) { n.selected = false; n.enabled = false; }

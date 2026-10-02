@@ -38,5 +38,20 @@ public class Smoke {
         } catch (Smf.FormatException e) {
             System.out.println("truncated file: PASS (" + e.getMessage() + ")");
         }
+
+        // an event whose payload crosses its own track boundary must be rejected
+        byte[] evil = new byte[] {
+            0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 1, 0, 2, 0x01, (byte) 0xE0,
+            0x4D, 0x54, 0x72, 0x6B, 0, 0, 0, 4,          // track 0: 4 bytes
+            0x00, (byte) 0xFF, 0x01, 0x05,               // meta text claiming 5 bytes
+            0x4D, 0x54, 0x72, 0x6B, 0, 0, 0, 3,          // track 1: 3 bytes
+            0x00, (byte) 0xFF, 0x2F, 0x00
+        };
+        try {
+            Smf.read(evil);
+            System.out.println("track-overrun file: FAIL (no exception)");
+        } catch (Smf.FormatException e) {
+            System.out.println("track-overrun file: PASS (" + e.getMessage() + ")");
+        }
     }
 }
