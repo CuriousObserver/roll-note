@@ -154,6 +154,8 @@ public final class Dialogs {
         private final JDialog dialog;
         private boolean rebuilding = false;
         private Runnable onClosed = () -> {};
+        private Object[] rowObjects = new Object[0];   // parallel to noteModel rows (time-sorted)
+        private int rowSignature = -1;                 // cheap change detection
 
         private EventsDialog(JFrame parent, java.util.function.Supplier<Song> song, EditCallback cb) {
             this.parent = parent;
@@ -163,8 +165,7 @@ public final class Dialogs {
 
             noteList.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
             noteList.setCellRenderer((list, value, index, isSel, hasFocus) -> {
-                Song s = song.get();
-                Object o = (index >= 0 && index < itemCount(s)) ? itemAt(s, index) : null;
+                Object o = (index >= 0 && index < rowObjects.length) ? rowObjects[index] : null;
                 JLabel l = new JLabel(" " + value);
                 l.setOpaque(true);
                 if (o instanceof Note && ((Note) o).selected) {
@@ -181,16 +182,20 @@ public final class Dialogs {
             });
             noteList.addListSelectionListener(e -> {
                 if (e.getValueIsAdjusting() || rebuilding) return;
-                Song s = song.get();
                 int[] idx = noteList.getSelectedIndices();
-                boolean anyNote = false;
-                for (int i : idx) if (itemAt(s, i) instanceof Note) { anyNote = true; break; }
-                if (!anyNote) return;
-                s.clearSelection();
+                java.util.Set<Note> target = new java.util.HashSet<>();
                 for (int i : idx) {
-                    Object o = itemAt(s, i);
-                    if (o instanceof Note) ((Note) o).selected = true;
+                    Object o = (i >= 0 && i < rowObjects.length) ? rowObjects[i] : null;
+                    if (o instanceof Note) target.add((Note) o);
                 }
+                if (target.isEmpty()) return;
+                Song s = song.get();
+                boolean same = true;
+                for (Note n : s.notes)
+                    if (n.selected != target.contains(n)) { same = false; break; }
+                if (same) return;                    // already mirrored: do nothing
+                s.clearSelection();
+                for (Note n : target) n.selected = true;
                 cb.changed();
             });
             metaList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
@@ -242,7 +247,7 @@ public final class Dialogs {
                 int i = noteList.getSelectedIndex();
                 if (i < 0) return;
                 cb.pushUndo();
-                Object it = itemAt(s, i);
+                Object it = rowObjects[i];
                 boolean removed = editItem(parent, s, it);
                 if (removed) removeItem(s, it);
                 cb.changed();
@@ -258,7 +263,7 @@ public final class Dialogs {
                 int i = noteList.getSelectedIndex();
                 if (i < 0) return;
                 cb.pushUndo();
-                removeItem(s, itemAt(s, i));
+                removeItem(s, rowObjects[i]);
                 cb.changed();
             });
             close.addActionListener(e -> dialog.dispose());
@@ -282,39 +287,44 @@ public final class Dialogs {
 
         public void setOnClosed(Runnable r) { onClosed = r; }
 
-        /** rebuild the rows from the current song and mirror the roll selection */
+        /** rebuild the rows (only when the content changed) and mirror the roll selection */
         public void refresh() {
             Song s = song.get();
+            int sig = s.notes.size() * 31 + s.ctrls.size() * 17 + s.metas.size();
             rebuilding = true;
             try {
-                noteModel.clear();
-                for (Object o : items(s)) {
-                    if (o instanceof Note) {
-                        Note n = (Note) o;
-                        noteModel.addElement(String.format("N  tr%d ch%02d %s dur %d  note %s vel %d%s",
-                                n.track, n.channel, s.barBeatTick(n.start), n.dur,
-                                NoteName2.name(n.note), n.velocity, n.selected ? "  [sel]" : ""));
-                    } else {
-                        CtrlEvent c = (CtrlEvent) o;
-                        noteModel.addElement(String.format("C  tr%d ch%02d %s code %c d1 %d d2 %s",
-                                c.track, c.channel, s.barBeatTick(c.time), c.code(), c.d1,
-                                c.d2 < 0 ? "-" : Integer.toString(c.d2)));
+                if (sig != rowSignature) {
+                    rowSignature = sig;
+                    java.util.List<Object> its = items(s);
+                    rowObjects = its.toArray(new Object[0]);
+                    noteModel.clear();
+                    for (Object o : its) {
+                        if (o instanceof Note) {
+                            Note n = (Note) o;
+                            noteModel.addElement(String.format("N  tr%d ch%02d %s dur %d  note %s vel %d",
+                                    n.track, n.channel, s.barBeatTick(n.start), n.dur,
+                                    NoteName2.name(n.note), n.velocity));
+                        } else {
+                            CtrlEvent c = (CtrlEvent) o;
+                            noteModel.addElement(String.format("C  tr%d ch%02d %s code %c d1 %d d2 %s",
+                                    c.track, c.channel, s.barBeatTick(c.time), c.code(), c.d1,
+                                    c.d2 < 0 ? "-" : Integer.toString(c.d2)));
+                        }
                     }
+                    noteHead.setText(noteModel.size() + " note/control events");
+                    metaModel.clear();
+                    for (MetaEvent x : s.metas) {
+                        metaModel.addElement(String.format("M  tr%d %s  %s", x.track, s.barBeatTick(x.time), x.display()));
+                    }
+                    metaHead.setText(metaModel.size() + " meta events");
                 }
-                noteHead.setText(noteModel.size() + " note/control events");
                 int[] sel = new int[s.countSelectedNotes()];
                 int k = 0;
-                for (int i = 0; i < itemCount(s); i++) {
-                    Object o = itemAt(s, i);
-                    if (o instanceof Note && ((Note) o).selected && k < sel.length) sel[k++] = i;
+                for (int i = 0; i < rowObjects.length; i++) {
+                    Object o = rowObjects[i];
+                    if (o instanceof Note && ((Note) o).selected) sel[k++] = i;
                 }
-                noteList.setSelectedIndices(sel);
-
-                metaModel.clear();
-                for (MetaEvent x : s.metas) {
-                    metaModel.addElement(String.format("M  tr%d %s  %s", x.track, s.barBeatTick(x.time), x.display()));
-                }
-                metaHead.setText(metaModel.size() + " meta events");
+                noteList.setSelectedIndices(java.util.Arrays.copyOf(sel, k));
             } finally {
                 rebuilding = false;
             }
@@ -336,11 +346,6 @@ public final class Dialogs {
             return Long.compare(ta, tb);
         });
         return out;
-    }
-    private static int itemCount(Song s) { return s.notes.size() + s.ctrls.size(); }
-    private static Object itemAt(Song s, int i) {
-        if (i < s.notes.size()) return s.notes.get(i);
-        return s.ctrls.get(i - s.notes.size());
     }
     private static void removeItem(Song s, Object o) {
         if (o instanceof Note) s.notes.remove(o);
