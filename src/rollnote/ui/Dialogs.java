@@ -450,8 +450,8 @@ public final class Dialogs {
         data.setLineWrap(true);
         data.setText(new String(item.data, StandardCharsets.ISO_8859_1));
         JLabel hint = new JLabel("Text-like meta data. Type " + item.typeName() + ".");
-        p.add(hint, BorderLayout.CENTER);
         p.add(new JScrollPane(data), BorderLayout.CENTER);
+        p.add(hint, BorderLayout.SOUTH);
         String[] opts = {"Cancel", "Replace", "Insert"};
         int r = JOptionPane.showOptionDialog(owner, p, "Edit meta event",
                 JOptionPane.DEFAULT_OPTION, JOptionPane.PLAIN_MESSAGE, null, opts, opts[1]);

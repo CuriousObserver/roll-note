@@ -7,6 +7,7 @@ public final class Song {
     public int division = 480;      // ticks per quarter note
     public int formatIn = 1;        // original SMF format
     public long tempoMicros = 500_000L;
+    public int trackCountOrig = 1;   // track count in the loaded file
     public ArrayList<Note> notes = new ArrayList<>();
     public ArrayList<CtrlEvent> ctrls = new ArrayList<>();
     public ArrayList<MetaEvent> metas = new ArrayList<>();
@@ -19,6 +20,7 @@ public final class Song {
         s.division = division;
         s.formatIn = formatIn;
         s.tempoMicros = tempoMicros;
+        s.trackCountOrig = trackCountOrig;
         s.sourceName = sourceName;
         for (Note n : notes) s.notes.add(n.copy());
         for (CtrlEvent c : ctrls) s.ctrls.add(c.copy());

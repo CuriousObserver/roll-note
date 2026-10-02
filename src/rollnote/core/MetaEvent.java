@@ -56,8 +56,10 @@ public final class MetaEvent {
                 return "";
             case 0x59:
                 if (data.length >= 2) {
-                    int key = data[0];
-                    String n = NoteName.name(((key % 12) + 12) % 12 + 12);
+                    int sf = data[0];        // signed: -7..7, sharps positive, flats negative
+                    String[] sharps = {"C", "G", "D", "A", "E", "B", "F#", "C#"};
+                    String[] flats  = {"C", "F", "Bb", "Eb", "Ab", "Db", "Gb", "Cb"};
+                    String n = sf >= 0 ? sharps[Math.min(sf, 7)] : flats[Math.min(-sf, 7)];
                     return n + (data[1] == 0 ? " major" : " minor");
                 }
                 return "";

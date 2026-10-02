@@ -500,12 +500,13 @@ public class RollView extends JPanel implements Scrollable {
         if (penMode) {                            // insertion mode
             pressTick = quantize(tickAtY(y));
             pressNote = noteAtX(x);
-            if (!insertNote(pressNote, pressTick)) {
+            if (!canInsert(pressNote, pressTick)) {
                 mode = NONE;
                 return;
             }
-            listener.pushUndo();
+            listener.pushUndo();                  // snapshot BEFORE the note is added
             undoPushed = true;
+            insertNote(pressNote, pressTick);
             mode = INSERT;
             dragT0 = pressTick;
             listener.changed();
@@ -553,17 +554,22 @@ public class RollView extends JPanel implements Scrollable {
             if (n.selected) base.add(new long[]{n.note, n.start, n.dur});
     }
 
-    private boolean insertNote(int note, long tick) {
+    /** would a pen insert at (note, tick) collide with an existing note? */
+    private boolean canInsert(int note, long tick) {
         long dur = Math.max(quantRes, quantize(noteDur));
         for (Note o : song.notes)
             if (o.enabled && o.note == note && tick < o.end() && tick + dur > o.start)
-                return false;                    // cannot insert on top of an existing note
+                return false;
+        return true;
+    }
+
+    private void insertNote(int note, long tick) {
+        long dur = Math.max(quantRes, quantize(noteDur));
         Note n = new Note(note, velocity, tick, dur, channel, track);
         n.selected = true;
         song.clearSelection();
         song.notes.add(n);
         insertedNote = n;
-        return true;
     }
 
     private Note insertedNote;

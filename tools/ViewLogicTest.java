@@ -26,8 +26,9 @@ public class ViewLogicTest {
         s.division = 240;
         AtomicInteger changes = new AtomicInteger();
         AtomicInteger marked = new AtomicInteger(-1);
+        AtomicInteger sizeAtUndo = new AtomicInteger(-1);
         RollView.Listener listener = new RollView.Listener() {
-            @Override public void pushUndo() {}
+            @Override public void pushUndo() { sizeAtUndo.set(s.notes.size()); }
             @Override public void changed() { changes.incrementAndGet(); }
             @Override public void hover(String st) {}
             @Override public void pointerHover(int note, long tick) {}
@@ -56,6 +57,7 @@ public class ViewLogicTest {
         check("pen note start on grid", n.start == 2400);
         check("pen note duration dragged", n.dur == 120);
         check("pen note selected", n.selected);
+        check("pen insert snapshot is pre-insert", sizeAtUndo.get() == 0);
 
         // 2) move drag: upper half, +7 semitones, +120 ticks
         press(v, px(v, 60), py(v, 2400) + 1);

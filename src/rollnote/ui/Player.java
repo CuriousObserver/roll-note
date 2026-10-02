@@ -94,9 +94,12 @@ public final class Player {
         s.division = song.division;
         s.formatIn = 1;
         s.tempoMicros = song.tempoMicros;
-        boolean[] chanUsed = new boolean[16];
-        for (Note n : song.notes)
-            if (n.enabled) chanUsed[n.channel] = true;
+        boolean[] chanHasNotes = new boolean[16];
+        boolean[] chanEnabled = new boolean[16];
+        for (Note n : song.notes) {
+            chanHasNotes[n.channel] = true;
+            if (n.enabled) chanEnabled[n.channel] = true;
+        }
 
         for (Note n : song.notes) {
             if (!n.enabled) continue;
@@ -106,7 +109,8 @@ public final class Player {
             s.notes.add(new Note(n.note, n.velocity, start - from, end - start, n.channel, n.track));
         }
         for (CtrlEvent c : song.ctrls) {
-            if (!chanUsed[c.channel]) continue;
+            // skip only fully disabled channels; keep controller-only passages
+            if (chanHasNotes[c.channel] && !chanEnabled[c.channel]) continue;
             long t = c.time >= from ? c.time - from : 0;
             s.ctrls.add(new CtrlEvent(c.track, c.channel, t, c.status, c.d1, c.d2));
         }

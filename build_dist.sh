@@ -51,6 +51,6 @@ if [ "$(uname)" = Linux ]; then
 else
   OUT=dist/RollNote-windows.zip
   rm -f "$OUT"
-  (cd build/zip && powershell -NoProfile -Command "Compress-Archive -Force -Path RollNote -DestinationPath \"../$OUT\"")
+  (cd build/zip && powershell -NoProfile -Command "Compress-Archive -Force -Path RollNote -DestinationPath \"../../$OUT\"")
 fi
 echo "DONE: $OUT"

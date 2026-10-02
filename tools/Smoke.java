@@ -30,5 +30,13 @@ public class Smoke {
         int i = 0;
         for (Note n : s.notes) for (Note n2 : s2.notes) if (n2.start == n.start && n2.note == n.note) { t0 += n2.start; d0 += n2.dur; i++; break; }
         System.out.println("matched=" + i + "/" + s.notes.size() + " all=" + ok);
+
+        // malformed input must be reported as FormatException, not a crash
+        try {
+            Smf.read(java.util.Arrays.copyOf(in, in.length - 3));
+            System.out.println("truncated file: FAIL (no exception)");
+        } catch (Smf.FormatException e) {
+            System.out.println("truncated file: PASS (" + e.getMessage() + ")");
+        }
     }
 }

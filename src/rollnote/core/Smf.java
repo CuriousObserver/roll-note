@@ -37,6 +37,7 @@ public final class Smf {
         Song s = new Song();
         s.division = division == 0 ? 480 : division;
         s.formatIn = format;
+        s.trackCountOrig = Math.max(1, ntrks);
         ArrayList<Note> notes = new ArrayList<>();
         ArrayList<CtrlEvent> ctrls = new ArrayList<>();
         ArrayList<MetaEvent> metas = new ArrayList<>();
@@ -45,6 +46,8 @@ public final class Smf {
             if (r.tag(4) != 0x4D54726B)
                 throw new FormatException("expected MTrk at " + r.pos + " track " + t + " of " + ntrks);
             long len = r.u32();
+            if (r.pos + len > b.length)
+                throw new FormatException("track " + t + " overruns the file");
             long endPos = r.pos + len;
             long time = 0;
             int running = 0;
@@ -130,13 +133,17 @@ public final class Smf {
         int ntrks;
         if (format == 0) ntrks = 1;
         else if (trackIsChannel) ntrks = 16;
-        else ntrks = Math.max(1, s.trackCount());
+        else ntrks = Math.max(1, Math.max(s.trackCount(), s.trackCountOrig));
 
         List<List<Ev>> trkEvents = new ArrayList<>();
         for (int i = 0; i < ntrks; i++) trkEvents.add(new ArrayList<>());
 
-        boolean[] chanUsed = new boolean[16];
-        for (Note n : s.notes) if (n.enabled) chanUsed[n.channel] = true;
+        boolean[] chanHasNotes = new boolean[16];
+        boolean[] chanEnabled = new boolean[16];
+        for (Note n : s.notes) {
+            chanHasNotes[n.channel] = true;
+            if (n.enabled) chanEnabled[n.channel] = true;
+        }
 
         for (Note n : s.notes) {
             if (!n.enabled) continue;                 // disabled notes are not written
@@ -146,7 +153,9 @@ public final class Smf {
             trkEvents.get(trk).add(new Ev(n.start + n.dur, 3, chan, 0x80, n.note, 0));
         }
         for (CtrlEvent c : s.ctrls) {
-            if (!chanUsed[c.channel]) continue;
+            // drop events only of fully disabled channels (notes all off),
+            // so controller-only passages survive
+            if (chanHasNotes[c.channel] && !chanEnabled[c.channel]) continue;
             int chan = zeroChannel ? 0 : c.channel;
             int trk = format == 0 ? 0 : (trackIsChannel ? chan : Math.min(c.track, ntrks - 1));
             int hi = c.status & 0xF0;
@@ -226,24 +235,33 @@ public final class Smf {
     private static final class R {
         final byte[] b; int pos;
         R(byte[] b) { this.b = b; }
-        int u8() { return b[pos++] & 0xFF; }
-        int u16() { return (u8() << 8) | u8(); }
-        long u32() { long v = 0; for (int i = 0; i < 4; i++) v = (v << 8) | u8(); return v; }
-        int tag(int n) {
+        int u8() throws FormatException {
+            if (pos >= b.length) throw new FormatException("truncated MIDI data at " + pos);
+            return b[pos++] & 0xFF;
+        }
+        int u16() throws FormatException { return (u8() << 8) | u8(); }
+        long u32() throws FormatException { long v = 0; for (int i = 0; i < 4; i++) v = (v << 8) | u8(); return v; }
+        int tag(int n) throws FormatException {
             if (pos + n > b.length) return 0;
             int v = 0; for (int i = 0; i < n; i++) v = (v << 8) | u8();
             return v;
         }
-        byte[] bytes(int n) { byte[] r = new byte[n]; System.arraycopy(b, pos, r, 0, n); pos += n; return r; }
-        void skip(long n) { pos += (int) n; }
-        long vlq() {
+        byte[] bytes(int n) throws FormatException {
+            if (n < 0 || pos + n > b.length) throw new FormatException("truncated MIDI data at " + pos);
+            byte[] r = new byte[n]; System.arraycopy(b, pos, r, 0, n); pos += n; return r;
+        }
+        void skip(long n) throws FormatException {
+            if (n < 0 || pos + n > b.length) throw new FormatException("bad header length " + n);
+            pos += (int) n;
+        }
+        long vlq() throws FormatException {
             long v = 0;
             for (int i = 0; i < 4; i++) {
                 int x = u8();
                 v = (v << 7) | (x & 0x7F);
                 if ((x & 0x80) == 0) return v;
             }
-            return v;
+            throw new FormatException("malformed variable-length quantity at " + pos);
         }
     }
 
